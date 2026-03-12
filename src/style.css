@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --bg-primary: #0d0f1a;
+  --bg-secondary: #131629;
+  --bg-card: rgba(255,255,255,0.04);
+  --bg-card-hover: rgba(255,255,255,0.08);
+  --accent: #6c63ff;
+  --accent-2: #ff6584;
+  --text-primary: #f0f0f8;
+  --text-secondary: #9496b0;
+  --border: rgba(255,255,255,0.08);
+  --shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f4f5fb;
+  --bg-secondary: #eceef8;
+  --bg-card: rgba(255,255,255,0.9);
+  --bg-card-hover: rgba(255,255,255,1);
+  --text-primary: #1a1b2e;
+  --text-secondary: #5a5c75;
+  --border: rgba(0,0,0,0.08);
+  --shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.glass-card:hover {
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #6c63ff 0%, #ff6584 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Primary button */
+.btn-gradient {
+  background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.65rem 1.5rem;
+  transition: opacity 0.2s, transform 0.15s;
+  letter-spacing: 0.01em;
+}
+.btn-gradient:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+/* Outline button */
+.btn-glass {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 500;
+  border-radius: 12px;
+  padding: 0.65rem 1.5rem;
+  transition: background 0.2s;
+}
+.btn-glass:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* Form controls */
+.form-dark {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-dark::placeholder {
+  color: var(--text-secondary);
+}
+.form-dark:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+}
+
+/* Pill badge */
+.badge-status {
+  font-size: 0.7rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-ready { background: rgba(34,197,94,0.15); color: #4ade80; }
+.badge-processing { background: rgba(234,179,8,0.15); color: #fbbf24; }
+.badge-error { background: rgba(239,68,68,0.15); color: #f87171; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
