@@ -25,6 +25,30 @@
           <i class="bi bi-search search-icon"></i>
           <input v-model="searchQuery" class="search-input" placeholder="Search videos..." />
         </div>
+        <!-- additional filters -->
+        <div class="filter-group">
+          <select v-model="filterDept" class="filter-select">
+            <option value="">All Departments</option>
+            <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+          </select>
+          <select v-model="filterLevel" class="filter-select">
+            <option value="">All Levels</option>
+            <option v-for="l in [100,200,300,400,500]" :key="l" :value="l">{{ l }}L</option>
+          </select>
+        </div>
+        <!-- sort toggle -->
+        <div class="sort-group">
+          <button
+            class="sort-btn"
+            :class="{ active: sortBy === 'recent' }"
+            @click="sortBy = 'recent'"
+          >Recent</button>
+          <button
+            class="sort-btn"
+            :class="{ active: sortBy === 'trending' }"
+            @click="sortBy = 'trending'"
+          >Trending</button>
+        </div>
       </div>
 
       <div v-if="loading" class="state-center">
@@ -59,14 +83,45 @@ const authStore = useAuthStore()
 const videos = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
+const filterDept = ref('')
+const filterLevel = ref('')
+const sortBy = ref('recent')
+
+// derive list of departments from current videos for filtering
+const departments = computed(() => {
+  return [...new Set(videos.value.map(v => v.department).filter(d => !!d))].sort()
+})
 
 const filteredVideos = computed(() => {
-  if (!searchQuery.value) return videos.value
+  let vs = videos.value
   const q = searchQuery.value.toLowerCase()
-  return videos.value.filter(v =>
-    v.title?.toLowerCase().includes(q) ||
-    v.description?.toLowerCase().includes(q)
-  )
+  if (q) {
+    vs = vs.filter(v =>
+      v.title?.toLowerCase().includes(q) ||
+      v.description?.toLowerCase().includes(q) ||
+      v.courseCode?.toLowerCase().includes(q) ||
+      v.topic?.toLowerCase().includes(q) ||
+      v.department?.toLowerCase().includes(q)
+    )
+  }
+  if (filterDept.value) {
+    vs = vs.filter(v => v.department === filterDept.value)
+  }
+  if (filterLevel.value) {
+    vs = vs.filter(v => v.level == filterLevel.value)
+  }
+
+  // sorting
+  if (sortBy.value === 'trending') {
+    vs = [...vs].sort((a, b) => (b.views || 0) - (a.views || 0))
+  } else {
+    vs = [...vs].sort((a, b) => {
+      const da = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : 0
+      const db = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : 0
+      return db - da
+    })
+  }
+  return vs
 })
 
 const fetchVideos = async () => {
@@ -166,6 +221,29 @@ onMounted(fetchVideos)
 .search-input::placeholder { color: var(--text-secondary); }
 .search-input:focus { border-color: var(--accent); }
 
+  /* filter & sort UI */
+  .filter-group {
+    display: flex; gap: 0.7rem; margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .filter-select {
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.5rem 0.9rem; color: var(--text-primary);
+    font-size: 0.85rem; cursor: pointer; outline: none; min-width: 130px;
+  }
+  .filter-select option { background: #1a1b2e; }
+
+  .sort-group {
+    display: flex; gap: 0.5rem; margin-top: 0.75rem;
+  }
+  .sort-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-secondary); border-radius: 8px; padding: 0.4rem 0.9rem;
+    font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+  }
+  .sort-btn.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
 .video-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

@@ -99,8 +99,24 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
   // A. Create Initial Firestore Document
   // User ID from Token must match User ID from Form Data for security
   if (req.user.uid !== userId) {
-      fs.unlinkSync(file.path);
-      return res.status(403).json({ error: "Forbidden: UID mismatch." });
+    fs.unlinkSync(file.path);
+    return res.status(403).json({ error: "Forbidden: UID mismatch." });
+  }
+
+  // try to infer department from the course code (helps with filtering)
+  let departmentValue = ""
+  if (courseCode) {
+    try {
+      const courseSnap = await db.collection('courses')
+        .where('code', '==', courseCode)
+        .limit(1)
+        .get();
+      if (!courseSnap.empty) {
+        departmentValue = courseSnap.docs[0].data().department || ""
+      }
+    } catch (e) {
+      console.warn(`Could not lookup course for ${courseCode}:`, e.message)
+    }
   }
 
   let docRef;
@@ -109,6 +125,7 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       title: title || "EduVid Upload",
       description: description || "",
       courseCode: courseCode || "",
+      department: departmentValue,
       level: level || "",
       topic: topic || "",
       status: "processing",
@@ -120,16 +137,32 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       avgRating: 0
     });
     console.log(`[${docRef.id}] Video document created, starting YouTube upload from disk...`);
+
+    // increment the associated course's videoCount (if courseCode provided)
+    if (courseCode) {
+      try {
+        const courseSnap = await db.collection('courses')
+          .where('code', '==', courseCode)
+          .limit(1)
+          .get();
+        if (!courseSnap.empty) {
+          const courseRef = courseSnap.docs[0].ref;
+          await courseRef.update({ videoCount: admin.firestore.FieldValue.increment(1) });
+        }
+      } catch (countErr) {
+        console.warn(`Could not update videoCount for course ${courseCode}:`, countErr.message);
+      }
+    }
   } catch (dbError) {
-      console.error("Firestore creation error:", dbError);
-      fs.unlinkSync(file.path);
-      return res.status(500).json({ error: "Failed to initialize video entry in database." });
+    console.error("Firestore creation error:", dbError);
+    fs.unlinkSync(file.path);
+    return res.status(500).json({ error: "Failed to initialize video entry in database." });
   }
 
   // Respond immediately so frontend can show "Processing"
-  res.status(202).json({ 
-      message: "Upload received. Processing in background.",
-      videoId: docRef.id 
+  res.status(202).json({
+    message: "Upload received. Processing in background.",
+    videoId: docRef.id
   });
 
   // B. Process Video (Upload to YouTube -> Update Database -> Clean Disk)

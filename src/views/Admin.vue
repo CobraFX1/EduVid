@@ -84,7 +84,7 @@
                 <i class="bi bi-youtube"></i>
               </a>
               <button
-                @click="deleteVideo(video.id)"
+                @click="deleteVideo(video)"
                 class="action-btn del-btn"
                 title="Delete from Firestore"
               >
@@ -110,6 +110,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { db } from '../firebase'
 import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore'
+import { decrementCourseCount } from '../utils/course'
 
 const videos = ref([])
 const loading = ref(true)
@@ -186,10 +187,13 @@ const fetchVideos = async () => {
   finally { loading.value = false }
 }
 
-const deleteVideo = async (id) => {
+const deleteVideo = async (video) => {
   if (!confirm('Delete this Firestore record?')) return
-  await deleteDoc(doc(db, 'videos', id))
-  videos.value = videos.value.filter(v => v.id !== id)
+  await deleteDoc(doc(db, 'videos', video.id))
+  if (video.courseCode) {
+    decrementCourseCount(video.courseCode)
+  }
+  videos.value = videos.value.filter(v => v.id !== video.id)
 }
 
 const formatDate = (ts) => {

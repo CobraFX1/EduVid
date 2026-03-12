@@ -44,7 +44,7 @@
           <a v-if="video.videoId" :href="`https://www.youtube.com/watch?v=${video.videoId}`" target="_blank" class="action-btn yt-btn" title="YouTube">
             <i class="bi bi-youtube"></i>
           </a>
-          <button @click="deleteVideo(video.id)" class="action-btn del-btn" title="Delete">
+          <button @click="deleteVideo(video)" class="action-btn del-btn" title="Delete">
             <i class="bi bi-trash3"></i>
           </button>
         </div>
@@ -58,6 +58,7 @@ import { ref, onMounted } from 'vue'
 import { db } from '../firebase'
 import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
+import { decrementCourseCount } from '../utils/course'
 
 const authStore = useAuthStore()
 const videos = ref([])
@@ -74,10 +75,13 @@ const fetchVideos = async () => {
   loading.value = false
 }
 
-const deleteVideo = async (id) => {
+const deleteVideo = async (video) => {
   if (!confirm('Delete this video? This cannot be undone.')) return
-  await deleteDoc(doc(db, 'videos', id))
-  videos.value = videos.value.filter(v => v.id !== id)
+  await deleteDoc(doc(db, 'videos', video.id))
+  if (video.courseCode) {
+    decrementCourseCount(video.courseCode)
+  }
+  videos.value = videos.value.filter(v => v.id !== video.id)
 }
 
 const pillClass = (status) => ({ ready: 'pill-ready', processing: 'pill-processing', error: 'pill-error' }[status] || 'pill-processing')

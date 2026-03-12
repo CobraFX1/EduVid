@@ -72,6 +72,7 @@ import { useRouter } from 'vue-router'
 import { db } from '../firebase'
 import { doc, deleteDoc } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
+import { decrementCourseCount } from '../utils/course'
 
 const props = defineProps({ video: { type: Object, required: true } })
 const emit = defineEmits(['deleted'])
@@ -99,6 +100,10 @@ const deleteVideo = async () => {
   deleting.value = true
   try {
     await deleteDoc(doc(db, 'videos', props.video.id))
+    // decrement course count if applicable
+    if (props.video.courseCode) {
+      decrementCourseCount(props.video.courseCode)
+    }
     emit('deleted')
   } catch (e) {
     console.error(e)

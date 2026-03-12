@@ -55,7 +55,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db } from '../firebase'
-import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore'
 
 const courses = ref([])
 const loading = ref(true)
@@ -88,12 +88,14 @@ const groupedCourses = computed(() => {
   return groups
 })
 
-onMounted(async () => {
-  try {
-    const snap = await getDocs(query(collection(db, 'courses'), orderBy('code')))
+onMounted(() => {
+  const q = query(collection(db, 'courses'), orderBy('code'))
+  const unsub = onSnapshot(q, snap => {
     courses.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  } catch (e) { console.error(e) }
-  finally { loading.value = false }
+    loading.value = false
+  }, e => { console.error(e); loading.value = false })
+  // cleanup on unmount
+  return () => unsub()
 })
 </script>
 
