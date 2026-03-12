@@ -21,7 +21,7 @@ const routes = [
     { path: '/upload', name: 'Upload', component: Upload, meta: { requiresAuth: true } },
     { path: '/my-videos', name: 'MyVideos', component: MyVideos, meta: { requiresAuth: true } },
     { path: '/profile', name: 'Profile', component: Profile, meta: { requiresAuth: true } },
-    { path: '/admin', name: 'Admin', component: Admin, meta: { requiresAuth: true } },
+    { path: '/admin', name: 'Admin', component: Admin, meta: { requiresAuth: true, requiresAdmin: true } },
 ]
 
 const router = createRouter({
@@ -33,6 +33,8 @@ router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
     if (to.meta.requiresAuth && !authStore.user) {
         next('/login')
+    } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+        next('/')
     } else {
         next()
     }
