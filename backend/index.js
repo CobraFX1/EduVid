@@ -219,7 +219,41 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
     }
   }
 });
+/**
+ * STEP 1: Identity Check
+ * Checks if a Matric Number is unique and follows the required pattern.
+ */
+app.post('/api/auth/check-matric', async (req, res) => {
+  let { matricNumber } = req.body;
 
+  if (!matricNumber) {
+    return res.status(400).json({ error: 'Matric number is required.' });
+  }
+
+  // Normalize: Trim and force Uppercase
+  matricNumber = matricNumber.trim().toUpperCase();
+
+  // Regex: Must be 'DU' followed by exactly 4 digits
+  const matricRegex = /^DU\d{4}$/;
+
+  if (!matricRegex.test(matricNumber)) {
+    return res.status(400).json({ 
+      error: 'Invalid format. Use DU followed by 4 digits (e.g., DU1234).' 
+    });
+  }
+
+  try {
+    const usersRef = db.collection('users');
+    const query = usersRef.where('matricNumber', '==', matricNumber).limit(1);
+    const snapshot = await query.get();
+
+    // Send back true/false
+    res.json({ exists: !snapshot.empty });
+  } catch (error) {
+    console.error('Database check error:', error);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
 // 5. Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

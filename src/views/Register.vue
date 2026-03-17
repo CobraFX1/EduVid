@@ -8,7 +8,6 @@
         <p class="auth-sub">Dominion University Peer Learning Platform</p>
       </div>
 
-      <!-- Google OAuth -->
       <button @click="handleGoogle" class="google-btn" :disabled="loadingGoogle">
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon" />
         <span>{{ loadingGoogle ? 'Creating account...' : 'Sign up with Google' }}</span>
@@ -30,10 +29,10 @@
 
         <div class="form-row">
           <div class="field-group">
-            <label class="field-label">Department *</label>
-            <select v-model="department" class="form-dark" required>
-              <option value="" disabled>Select department</option>
-              <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+            <label class="field-label">Programme *</label>
+            <select v-model="programme" class="form-dark" required>
+              <option value="" disabled>Select programme</option>
+              <option v-for="p in programmes" :key="p" :value="p">{{ p }}</option>
             </select>
           </div>
           <div class="field-group">
@@ -89,7 +88,7 @@ import { useAuthStore } from '../stores/auth'
 
 const name = ref('')
 const matricNumber = ref('')
-const department = ref('')
+const programme = ref('') // Updated ref
 const level = ref('')
 const email = ref('')
 const password = ref('')
@@ -100,35 +99,47 @@ const loadingGoogle = ref(false)
 const router = useRouter()
 const authStore = useAuthStore()
 
-const departments = [
-  'Software Engineering',
-  'Computer Science',
-  'Information Technology',
-  'Computer Engineering',
-  'Electrical Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Accounting',
-  'Business Administration',
-  'Economics',
-  'Mass Communication',
-  'Law',
-  'Medicine',
-  'Nursing',
+// Updated to University Programmes
+const programmes = [
+  'B.Sc. Software Engineering',
+  'B.Sc. Computer Science',
+  'B.Sc. Information Technology',
+  'B.Sc. Cyber Security',
+  'B.Sc. Computer Engineering',
+  'B.Sc. Electrical Engineering',
+  'B.Sc. Mechanical Engineering',
+  'B.Sc. Civil Engineering',
+  'B.Sc. Accounting',
+  'B.Sc. Business Administration',
+  'B.Sc. Economics',
+  'B.Sc. Mass Communication',
+  'LL.B. Law',
+  'MBBS Medicine',
+  'B.NSc. Nursing',
 ]
 
 const handleRegister = async () => {
   errorMessage.value = ''
+  
   if (password.value !== confirmPassword.value) {
     errorMessage.value = 'Passwords do not match.'
     return
   }
+
+  // Pre-Check UI validation for better User Experience
+  const cleanMatric = matricNumber.value.trim().toUpperCase()
+  const matricRegex = /^DU\d{4}$/
+  if (!matricRegex.test(cleanMatric)) {
+    errorMessage.value = 'Invalid Matric format. Must be DU followed by 4 digits (e.g., DU1234).'
+    return
+  }
+
   loading.value = true
   try {
     await authStore.register(email.value, password.value, {
       name: name.value,
-      matricNumber: matricNumber.value,
-      department: department.value,
+      matricNumber: cleanMatric,
+      programme: programme.value, // Sending 'programme'
       level: level.value,
     })
     router.push('/')

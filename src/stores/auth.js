@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { auth, db, googleProvider } from '../firebase'
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signInWithPopup,
-  signOut, 
-  onAuthStateChanged 
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 
@@ -20,10 +20,37 @@ export const useAuthStore = defineStore('auth', {
     },
     actions: {
         async register(email, password, profileData = {}) {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-            this.user = userCredential.user
-            try { await this._createUserProfile(userCredential.user, profileData) }
-            catch (e) { console.warn('Profile write skipped (check Firestore rules):', e.message) }
+            // 1. Enforce Regex & Uppercase formatting
+            const rawMatric = profileData.matricNumber.trim().toUpperCase();
+            const matricRegex = /^DU\d{4}$/; // Pattern: DU followed by exactly 4 digits
+
+            if (!matricRegex.test(rawMatric)) {
+                throw new Error('Invalid Matric format. Must be DU followed by 4 numbers (e.g., DU1234).');
+            }
+
+            // 2. Perform the Uniqueness Check against the Database
+            const response = await fetch('http://localhost:3000/api/auth/check-matric', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ matricNumber: rawMatric })
+            });
+
+            const { exists } = await response.json();
+            if (exists) throw new Error('This Matric Number is already registered.');
+
+            // Reassign the clean matric number back into the data object
+            profileData.matricNumber = rawMatric;
+
+            // 3. Proceed to Firebase Auth Creation
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            this.user = userCredential.user;
+
+            // 4. Save the extra data to Firestore
+            try { 
+                await this._createUserProfile(userCredential.user, profileData) 
+            } catch (e) { 
+                console.warn('Profile write skipped (check Firestore rules):', e.message) 
+            }
         },
 
         async loginWithGoogle() {
@@ -58,7 +85,7 @@ export const useAuthStore = defineStore('auth', {
                 email: user.email,
                 name: extra.name || user.displayName || '',
                 matricNumber: extra.matricNumber || '',
-                department: extra.department || '',
+                programme: extra.programme || '', // UPDATED: Saved as 'programme' instead of 'department'
                 level: extra.level || '',
                 role: 'student',
                 isVerified: false,
