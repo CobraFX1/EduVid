@@ -6,7 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const dotenv = require("dotenv");
 const multer = require("multer");
-const nodemailer = require("nodemailer"); 
+const nodemailer = require("nodemailer");
 
 // Load backend/.env
 dotenv.config();
@@ -62,8 +62,8 @@ const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS, 
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -150,7 +150,7 @@ app.post('/api/auth/check-matric', async (req, res) => {
 app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
   const { email } = req.body;
   const uid = req.user.uid;
-  
+
   if (!email) return res.status(400).json({ error: "Email is required." });
 
   try {
@@ -175,7 +175,7 @@ app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
       otp: otp,
       email: email,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: Date.now() + 10 * 60 * 1000, 
+      expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
     const mailOptions = {
@@ -236,11 +236,19 @@ app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
 // ==========================================
 
 // STEP 8: Secure Video Upload
+// STEP 8: Secure Video Upload (Finalized with Metadata Framework)
 app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) => {
-  const file = req.file; 
-  const { title, description, userId, userEmail, courseCode, level, topic } = req.body;
+  const file = req.file;
+  // 🛡️ STEP 4: Extract all mandatory tags from req.body
+  const { title, description, userId, userEmail, courseCode, level, department, topic } = req.body;
 
   if (!file) return res.status(400).json({ error: "No video file provided." });
+
+  // 🛡️ THE BOUNCER: Check if mandatory tags exist before consuming any more resources
+  if (!title || !courseCode || !department || !level) {
+    if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path); // Cleanup disk immediately
+    return res.status(400).json({ error: "Mandatory Tagging Violation: Title, Course, Level, and Department are required." });
+  }
 
   try {
     // 🛡️ SECURITY: Verify user is verified and IDs match
@@ -255,24 +263,13 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       return res.status(403).json({ error: "Forbidden: UID mismatch." });
     }
 
-    // Attempt department lookup
-    let departmentValue = "";
-    if (courseCode) {
-      try {
-        const courseSnap = await db.collection('courses').where('code', '==', courseCode).limit(1).get();
-        if (!courseSnap.empty) departmentValue = courseSnap.docs[0].data().department || "";
-      } catch (e) {
-        console.warn(`Could not lookup course for ${courseCode}:`, e.message);
-      }
-    }
-
-    // 1. Create DB Entry
+    // 1. Create Initial Firestore Document
     const docRef = await db.collection("videos").add({
-      title: title || "EduVid Upload",
+      title: title.trim(),
       description: description || "",
-      courseCode: courseCode || "",
-      department: departmentValue,
-      level: level || "",
+      courseCode: courseCode, // Normalized (e.g., SEN401)
+      department: department,
+      level: parseInt(level), // Ensure stored as Number
       topic: topic || "",
       status: "processing",
       userId: userId,
@@ -282,55 +279,61 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       isFlagged: false,
       avgRating: 0
     });
-    
-    // Increment course video count
-    if (courseCode) {
-      try {
-        const courseSnap = await db.collection('courses').where('code', '==', courseCode).limit(1).get();
-        if (!courseSnap.empty) {
-          await courseSnap.docs[0].ref.update({ videoCount: admin.firestore.FieldValue.increment(1) });
-        }
-      } catch (countErr) {
-        console.warn(`Could not update videoCount:`, countErr.message);
-      }
-    }
 
-    // Respond to client immediately
+    // Respond immediately so frontend shows "Processing" UI
     res.status(202).json({ message: "Upload received. Processing in background.", videoId: docRef.id });
 
-    // 2. Upload to YouTube
+    // 2. Upload to YouTube (Background Task)
     await docRef.update({ stage: "uploading_to_youtube", statusMessage: "Uploading video to YouTube..." });
+
     const youtubeRes = await youtube.videos.insert({
       part: "snippet,status",
       requestBody: {
-        snippet: { title: title || "EduVid Upload", description: description || "Uploaded via EduVid" },
+        snippet: { 
+          title: title, 
+          description: description || `Educational content for ${courseCode} via EduVid` 
+        },
         status: { privacyStatus: "unlisted" },
       },
       media: { body: fs.createReadStream(file.path) },
     });
 
-    // 3. Update Firestore
     const ytVideoId = youtubeRes.data.id;
+
+    // 3. Finalize Document & Meta Updates
     await docRef.update({
       videoId: ytVideoId,
       videoUrl: `https://www.youtube.com/watch?v=${ytVideoId}`,
       thumbnailUrl: `https://img.youtube.com/vi/${ytVideoId}/maxresdefault.jpg`,
-      type: "youtube",
       status: "ready",
       stage: "complete",
-      statusMessage: "Published to YouTube successfully.",
+      statusMessage: "Published successfully.",
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // 📈 STEP 5: Automated Course Count Aggregation
+    try {
+      // Assumes your Course Document ID is the Course Code (e.g., SEN401)
+      const courseRef = db.collection('courses').doc(courseCode);
+      await courseRef.update({
+        videoCount: admin.firestore.FieldValue.increment(1)
+      });
+      console.log(`[Framework] videoCount incremented for ${courseCode}`);
+    } catch (countErr) {
+      console.warn(`[Framework] Could not update count for ${courseCode}:`, countErr.message);
+    }
+
   } catch (error) {
-    console.error("Upload process error:", error);
-    // If we have a docRef, we could update it to error status here.
+    console.error("Critical Upload Error:", error);
+    // Optional: await docRef.update({ status: 'error', error: error.message });
   } finally {
-    // Cleanup local temp file
-    if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    // 4. Cleanup local temp file from server disk
+    if (file && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+      console.log(`[Cleanup] Temp file removed for ${title}`);
+    }
   }
 });
-
 // STEP 7: Admin-Only Route Example
 app.get("/api/admin/flagged-videos", verifyToken, verifyAdmin, async (req, res) => {
   try {

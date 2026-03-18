@@ -3,9 +3,7 @@
     <div v-if="loading" class="state-center"><div class="spinner"></div></div>
     <template v-else-if="video">
       <div class="watch-layout">
-        <!-- Main player column -->
         <div class="player-col">
-          <!-- YouTube embed -->
           <div class="player-wrap">
             <iframe
               v-if="video.videoId"
@@ -20,17 +18,28 @@
             </div>
           </div>
 
-          <!-- Video info -->
           <div class="video-info-card glass-card">
             <div class="info-top">
-              <div>
+              <div class="tags-row">
                 <span v-if="video.courseCode" class="course-tag">{{ video.courseCode }}</span>
                 <span v-if="video.topic" class="topic-tag">{{ video.topic }}</span>
               </div>
-              <span class="status-pill" :class="video.status === 'ready' ? 'pill-ready' : 'pill-processing'">
-                {{ video.status }}
-              </span>
+              
+              <div class="info-actions">
+                <button 
+                  v-if="authStore.user?.uid === video.userId" 
+                  @click="showEditModal = true" 
+                  class="edit-meta-btn"
+                >
+                  <i class="bi bi-pencil-square"></i> Edit Tags
+                </button>
+
+                <span class="status-pill" :class="video.status === 'ready' ? 'pill-ready' : 'pill-processing'">
+                  {{ video.status }}
+                </span>
+              </div>
             </div>
+
             <h1 class="video-title">{{ video.title }}</h1>
             <div class="video-meta">
               <span><i class="bi bi-eye me-1"></i>{{ video.views || 0 }} views</span>
@@ -41,9 +50,7 @@
             </div>
             <p v-if="video.description" class="video-desc">{{ video.description }}</p>
 
-            <!-- Actions row -->
             <div class="actions-row">
-              <!-- Clarity Rating -->
               <div class="rating-group">
                 <span class="action-label">Clarity</span>
                 <div class="stars">
@@ -59,7 +66,6 @@
                 <span class="rating-avg">{{ video.avgRating?.toFixed(1) || '—' }} / 5</span>
               </div>
 
-              <!-- Flag button -->
               <button @click="showFlagModal = true" class="flag-btn" :class="{ flagged: video.isFlagged }">
                 <i :class="video.isFlagged ? 'bi bi-flag-fill' : 'bi bi-flag'"></i>
                 {{ video.isFlagged ? 'Flagged' : 'Flag content' }}
@@ -67,11 +73,9 @@
             </div>
           </div>
 
-          <!-- Comments -->
           <div class="comments-section glass-card">
             <h3 class="comments-title">Comments <span class="count-chip">{{ comments.length }}</span></h3>
 
-            <!-- Add comment -->
             <div v-if="authStore.user" class="add-comment">
               <textarea
                 v-model="newComment"
@@ -88,10 +92,6 @@
               <router-link to="/login" class="auth-link">Sign in</router-link> to leave a comment.
             </p>
 
-            <div v-if="comments.length === 0 && !loadingComments" class="no-comments">
-              <i class="bi bi-chat-dots" style="font-size:1.5rem; opacity:0.3;"></i>
-              <p>No comments yet. Be the first!</p>
-            </div>
             <div class="comment-list">
               <div v-for="c in comments" :key="c.id" class="comment-item">
                 <div class="comment-avatar">{{ (c.userEmail || 'U')[0].toUpperCase() }}</div>
@@ -107,7 +107,6 @@
           </div>
         </div>
 
-        <!-- Sidebar -->
         <div class="sidebar-col">
           <h3 class="sidebar-title">More Videos</h3>
           <div v-for="v in relatedVideos" :key="v.id" class="related-card glass-card" @click="$router.push(`/watch/${v.id}`)">
@@ -122,10 +121,37 @@
       </div>
     </template>
 
-    <!-- Flag modal -->
+    <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
+      <div class="modal-box glass-card edit-modal">
+        <h4 class="modal-title">Edit Video Metadata</h4>
+        
+        <div class="field-group">
+          <label class="field-label">Topic</label>
+          <input v-model="editData.topic" class="form-input" placeholder="e.g. Linked Lists" />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Course Code</label>
+          <input v-model="editData.courseCode" class="form-input" placeholder="e.g. SEN401" />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Description</label>
+          <textarea v-model="editData.description" class="form-input" rows="3"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-glass" @click="showEditModal = false">Cancel</button>
+          <button class="btn-gradient" @click="updateMetadata" :disabled="updatingMeta">
+            {{ updatingMeta ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showFlagModal" class="modal-overlay" @click.self="showFlagModal = false">
       <div class="modal-box glass-card">
-        <h4><i class="bi bi-flag-fill me-2" style="color:#fbbf24;"></i>Flag this content</h4>
+        <h4><i class="bi bi-flag-fill me-2" style="color:#fbbf24;"></i>Flag content</h4>
         <p>Why are you flagging this video?</p>
         <div class="flag-options">
           <label v-for="reason in flagReasons" :key="reason" class="flag-option">
@@ -136,17 +162,16 @@
         <div class="modal-actions">
           <button class="btn-glass" @click="showFlagModal = false">Cancel</button>
           <button class="btn-delete" @click="submitFlag" :disabled="!flagReason || submittingFlag">
-            {{ submittingFlag ? 'Submitting...' : 'Submit Flag' }}
+            Submit Flag
           </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, getDocs, addDoc, updateDoc,
@@ -155,34 +180,102 @@ import {
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
+const videoId = route.params.id
+
+// Core State
 const video = ref(null)
 const loading = ref(true)
 const comments = ref([])
 const loadingComments = ref(true)
 const relatedVideos = ref([])
+
+// Interaction State
 const newComment = ref('')
 const submittingComment = ref(false)
 const myRating = ref(0)
 const showFlagModal = ref(false)
 const flagReason = ref('')
 const submittingFlag = ref(false)
-const flagReasons = [
-  'Inaccurate academic content',
-  'Inappropriate or offensive',
-  'Copyright infringement',
-  'Spam or misleading',
-  'Other'
-]
 
-const videoId = route.params.id
+// ✍️ Step 10 State
+const showEditModal = ref(false)
+const updatingMeta = ref(false)
+const editData = ref({
+  topic: '',
+  courseCode: '',
+  description: ''
+})
+
+const flagReasons = ['Inaccurate academic content', 'Inappropriate or offensive', 'Copyright infringement', 'Spam or misleading', 'Other']
+
+// Sync modal with video data
+watch(video, (newVal) => {
+  if (newVal) {
+    editData.value = {
+      topic: newVal.topic || '',
+      courseCode: newVal.courseCode || '',
+      description: newVal.description || ''
+    }
+  }
+}, { immediate: true })
+
+// Handle ID changes via sidebar
+watch(() => route.params.id, (newId) => {
+  if (newId) window.location.reload() 
+})
+
+// --- Logic Functions ---
 
 const loadComments = async () => {
-  const snap = await getDocs(
-    query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc'))
-  )
+  const snap = await getDocs(query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc')))
   comments.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
   loadingComments.value = false
+}
+
+const loadRecommendations = async (currentVideo) => {
+  try {
+    const courseQuery = query(collection(db, 'videos'), where('courseCode', '==', currentVideo.courseCode), where('status', '==', 'ready'), limit(8))
+    const courseSnap = await getDocs(courseQuery)
+    let results = courseSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId)
+
+    if (results.length < 3) {
+      const deptQuery = query(collection(db, 'videos'), where('department', '==', currentVideo.department), where('status', '==', 'ready'), limit(8))
+      const deptSnap = await getDocs(deptQuery)
+      const deptResults = deptSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId && !results.some(r => r.id === v.id))
+      results = [...results, ...deptResults].slice(0, 6)
+    }
+    relatedVideos.value = results
+  } catch (err) { console.error("Recommendation Error:", err) }
+}
+
+// ✍️ Step 10: Update Metadata Logic
+const updateMetadata = async () => {
+  if (!authStore.user || updatingMeta.value) return
+  updatingMeta.value = true
+  try {
+    const videoRef = doc(db, 'videos', videoId)
+    const cleanCode = editData.value.courseCode.replace(/\s+/g, '').toUpperCase()
+    
+    await updateDoc(videoRef, {
+      topic: editData.value.topic.trim(),
+      courseCode: cleanCode,
+      description: editData.value.description.trim()
+    })
+
+    // Update UI
+    video.value.topic = editData.value.topic
+    video.value.courseCode = cleanCode
+    video.value.description = editData.value.description
+    
+    showEditModal.value = false
+  } catch (err) {
+    console.error("Update Error:", err)
+    alert("Failed to update metadata.")
+  } finally {
+    updatingMeta.value = false
+  }
 }
 
 const submitComment = async () => {
@@ -194,9 +287,7 @@ const submitComment = async () => {
     userEmail: authStore.user.email,
     createdAt: serverTimestamp()
   })
-  newComment.value = ''
-  submittingComment.value = false
-  await loadComments()
+  newComment.value = ''; submittingComment.value = false; await loadComments()
 }
 
 const submitRating = async (stars) => {
@@ -204,12 +295,10 @@ const submitRating = async (stars) => {
   myRating.value = stars
   const ratingsRef = collection(db, 'videos', videoId, 'ratings')
   const existing = await getDocs(query(ratingsRef, where('userId', '==', authStore.user.uid)))
-  if (!existing.empty) {
-    await updateDoc(existing.docs[0].ref, { rating: stars })
-  } else {
-    await addDoc(ratingsRef, { userId: authStore.user.uid, rating: stars, createdAt: serverTimestamp() })
-  }
-  // Recompute average
+  
+  if (!existing.empty) await updateDoc(existing.docs[0].ref, { rating: stars })
+  else await addDoc(ratingsRef, { userId: authStore.user.uid, rating: stars, createdAt: serverTimestamp() })
+
   const allRatings = await getDocs(ratingsRef)
   const avg = allRatings.docs.reduce((s, d) => s + d.data().rating, 0) / allRatings.size
   await updateDoc(doc(db, 'videos', videoId), { avgRating: avg })
@@ -226,14 +315,7 @@ const submitFlag = async () => {
     createdAt: serverTimestamp()
   })
   await updateDoc(doc(db, 'videos', videoId), { isFlagged: true })
-  video.value.isFlagged = true
-  submittingFlag.value = false
-  showFlagModal.value = false
-}
-
-// Increment view count
-const trackView = async () => {
-  await updateDoc(doc(db, 'videos', videoId), { views: increment(1) })
+  video.value.isFlagged = true; submittingFlag.value = false; showFlagModal.value = false
 }
 
 onMounted(async () => {
@@ -241,16 +323,10 @@ onMounted(async () => {
     const snap = await getDoc(doc(db, 'videos', videoId))
     if (snap.exists()) {
       video.value = { id: snap.id, ...snap.data() }
-      trackView()
+      await updateDoc(doc(db, 'videos', videoId), { views: increment(1) })
+      loadRecommendations(video.value)
     }
     await loadComments()
-    // Load related videos from same course
-    const relSnap = await getDocs(
-      query(collection(db, 'videos'),
-        where('courseCode', '==', video.value?.courseCode || ''),
-        orderBy('createdAt', 'desc'), limit(5))
-    )
-    relatedVideos.value = relSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId)
   } catch (e) { console.error(e) }
   finally { loading.value = false }
 })
@@ -265,7 +341,11 @@ const formatDate = (ts) => {
 <style scoped>
 .watch-page { max-width: 1440px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
 .watch-layout { display: grid; grid-template-columns: 1fr 360px; gap: 2rem; }
-@media (max-width: 960px) { .watch-layout { grid-template-columns: 1fr; } .sidebar-col { display: none; } }
+
+@media (max-width: 960px) { 
+  .watch-layout { grid-template-columns: 1fr; } 
+  .sidebar-col { display: none; } 
+}
 
 /* Player */
 .player-wrap { aspect-ratio: 16/9; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 1rem; }
@@ -277,18 +357,41 @@ const formatDate = (ts) => {
 }
 .player-placeholder p { font-size: 1rem; }
 
-/* Video info */
+/* Video info card */
 .video-info-card { padding: 1.5rem; margin-bottom: 1.5rem; }
 .info-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; gap: 0.5rem; }
+.tags-row { display: flex; gap: 0.35rem; }
+.info-actions { display: flex; align-items: center; gap: 0.75rem; }
+
 .course-tag {
   display: inline-block; background: rgba(108,99,255,0.15); color: var(--accent);
-  border-radius: 999px; padding: 3px 10px; font-size: 0.75rem; font-weight: 700;
-  margin-right: 0.35rem;
+  border-radius: 999px; padding: 3px 12px; font-size: 0.75rem; font-weight: 700;
 }
 .topic-tag {
   display: inline-block; background: rgba(255,101,132,0.12); color: #f9a8d4;
-  border-radius: 999px; padding: 3px 10px; font-size: 0.75rem; font-weight: 700;
+  border-radius: 999px; padding: 3px 12px; font-size: 0.75rem; font-weight: 700;
 }
+
+/* ✍️ Step 10: Edit Button Style */
+.edit-meta-btn {
+  background: rgba(108,99,255,0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.edit-meta-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
 .video-title { font-size: 1.4rem; font-weight: 800; margin: 0 0 0.5rem; }
 .video-meta { display: flex; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .video-desc { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; margin: 0 0 1rem; }
@@ -301,6 +404,7 @@ const formatDate = (ts) => {
 .star-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 1.1rem; padding: 0; transition: color 0.15s; }
 .star-btn.active { color: #fbbf24; }
 .rating-avg { font-size: 0.8rem; color: var(--text-secondary); }
+
 .flag-btn {
   display: flex; align-items: center; gap: 0.4rem; background: transparent;
   border: 1px solid var(--border); color: var(--text-secondary); border-radius: 10px;
@@ -314,52 +418,57 @@ const formatDate = (ts) => {
 .comments-title { font-size: 1rem; font-weight: 700; margin: 0 0 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
 .count-chip { background: rgba(108,99,255,0.12); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 0.75rem; }
 .add-comment { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1.5rem; }
-.comment-input { flex: 1; resize: none; }
-.comment-submit { padding: 0.5rem 1rem; height: auto; white-space: nowrap; }
-.login-prompt { color: var(--text-secondary); font-size: 0.875rem; }
-.auth-link { color: var(--accent); text-decoration: none; font-weight: 600; }
-.no-comments { text-align: center; padding: 2rem; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-.comment-list { display: flex; flex-direction: column; gap: 1rem; }
+.comment-input { flex: 1; resize: none; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 0.75rem; }
+.comment-submit { padding: 0.5rem 1.25rem; border-radius: 10px; font-weight: 600; }
+
+.comment-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .comment-item { display: flex; gap: 0.75rem; }
 .comment-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #6c63ff, #a855f7);
+  width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6c63ff, #a855f7);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-weight: 700; font-size: 0.875rem; flex-shrink: 0;
+  color: #fff; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
 }
 .comment-body { flex: 1; }
-.comment-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
-.comment-author { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+.comment-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.2rem; }
+.comment-author { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
 .comment-date { font-size: 0.75rem; color: var(--text-secondary); }
-.comment-text { font-size: 0.875rem; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+.comment-text { font-size: 0.9rem; color: var(--text-secondary); margin: 0; line-height: 1.5; }
 
 /* Sidebar */
 .sidebar-col { position: sticky; top: 80px; height: fit-content; }
-.sidebar-title { font-size: 1rem; font-weight: 700; margin: 0 0 1rem; color: var(--text-secondary); }
-.related-card { display: flex; gap: 0.75rem; padding: 0.75rem; margin-bottom: 0.75rem; cursor: pointer; border-radius: 12px; }
-.related-thumb { width: 100px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
-.related-thumb-ph { width: 100px; height: 60px; border-radius: 8px; background: rgba(108,99,255,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
-.related-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem; }
-.related-meta { font-size: 0.72rem; color: var(--text-secondary); margin: 0; }
+.sidebar-title { font-size: 1rem; font-weight: 700; margin: 0 0 1.25rem; color: var(--text-secondary); }
+.related-card { display: flex; gap: 0.75rem; padding: 0.75rem; margin-bottom: 0.75rem; cursor: pointer; border-radius: 12px; transition: transform 0.2s; }
+.related-card:hover { transform: translateX(5px); background: rgba(255,255,255,0.05); }
+.related-thumb { width: 120px; height: 68px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.related-thumb-ph { width: 120px; height: 68px; border-radius: 8px; background: rgba(108,99,255,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
+.related-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem; line-clamp: 2; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.related-meta { font-size: 0.75rem; color: var(--text-secondary); margin: 0; }
 
-/* Flag modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); }
-.modal-box { max-width: 400px; width: 90%; padding: 2rem; }
-.modal-box h4 { font-size: 1rem; font-weight: 700; margin: 0 0 0.5rem; color: var(--text-primary); }
-.modal-box p { color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 1rem; }
-.flag-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
-.flag-option { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; color: var(--text-secondary); font-size: 0.875rem; }
-.flag-option input { accent-color: var(--accent); }
-.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
-.btn-delete { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 12px; padding: 0.65rem 1.5rem; font-weight: 600; cursor: pointer; }
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(6px); }
+.modal-box { max-width: 450px; width: 90%; padding: 2rem; border: 1px solid var(--border); }
+.modal-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary); }
+
+/* ✍️ Step 10: Edit Modal Fields */
+.field-group { margin-bottom: 1.25rem; }
+.field-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
+.form-input { 
+  width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); 
+  border: 1px solid var(--border); border-radius: 8px; color: white; outline: none;
+}
+.form-input:focus { border-color: var(--accent); }
+
+.modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
+.btn-delete { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 10px; padding: 0.6rem 1.25rem; font-weight: 600; cursor: pointer; }
 .btn-delete:hover { background: rgba(239,68,68,0.25); }
-.btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Status & spinner */
+/* Status & Utils */
 .status-pill { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 10px; border-radius: 999px; }
 .pill-ready { background: rgba(34,197,94,0.12); color: #4ade80; }
 .pill-processing { background: rgba(234,179,8,0.12); color: #fbbf24; }
+
 .state-center { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; }
-.spinner { width: 36px; height: 36px; border: 3px solid rgba(108,99,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(108,99,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .spin { display: inline-block; animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

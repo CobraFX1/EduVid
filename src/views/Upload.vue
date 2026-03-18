@@ -142,11 +142,12 @@ const departments = [
 ]
 
 // Master list of courses categorized by department
+// Master list of courses categorized by department
 const courseDatabase = {
-  'Software Engineering': ['SEN 401', 'SEN 403', 'SEN 404', 'SEN 405', 'SEN 407', 'SEN 409', 'SEN 411'],
-  'Computer Science': ['CSC 101', 'CSC 201', 'CSC 301', 'CSC 401'],
-  'Cyber Security': ['CYB 201', 'CYB 301', 'CYB 401'],
-  'Information Technology': ['IFT 201', 'IFT 301', 'IFT 401']
+  'Software Engineering': ['SEN401', 'SEN403', 'SEN404', 'SEN405', 'SEN407', 'SEN409', 'SEN411'],
+  'Computer Science': ['CSC101', 'CSC201', 'CSC301', 'CSC401'],
+  'Cyber Security': ['CYB201', 'CYB301', 'CYB401'],
+  'Information Technology': ['IFT201', 'IFT301', 'IFT401']
 }
 
 const filteredCourses = computed(() => {
@@ -181,6 +182,7 @@ const handleDrop = (event) => {
   }
 }
 
+
 const uploadVideo = async () => {
   if (!selectedFile.value || !title.value || !courseCode.value || !level.value || !topic.value || !department.value) return
   if (!auth.currentUser) {
@@ -195,16 +197,22 @@ const uploadVideo = async () => {
   try {
     const token = await auth.currentUser.getIdToken()
     const formData = new FormData()
+
+    // 🛡️ NORMALIZATION: Force consistent casing and types
+    const cleanCourseCode = courseCode.value.replace(/\s+/g, '').toUpperCase()
+    const numericLevel = parseInt(level.value)
+
     formData.append('video', selectedFile.value)
-    formData.append('title', title.value)
-    formData.append('description', description.value)
+    formData.append('title', title.value.trim())
+    formData.append('description', description.value.trim())
     formData.append('department', department.value)
-    formData.append('courseCode', courseCode.value.replace(/\s+/g, ''))
-    formData.append('level', level.value)
-    formData.append('topic', topic.value)
+    formData.append('courseCode', cleanCourseCode) // e.g., "CSC101"
+    formData.append('level', numericLevel)         // e.g., 100 (as a number)
+    formData.append('topic', topic.value.trim())
     formData.append('userId', auth.currentUser.uid)
     formData.append('userEmail', auth.currentUser.email)
 
+    // ... (rest of your XHR logic remains the same)
     const xhr = new XMLHttpRequest()
     xhr.open('POST', 'http://localhost:3000/api/upload', true)
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
@@ -285,10 +293,15 @@ const uploadVideo = async () => {
 
 .gradient-text {
   background: linear-gradient(135deg, #6c63ff, #a855f7);
+  /* 1. Standard property (solves the warning) */
+  background-clip: text;
+  /* 2. Vendor prefix (for Safari/Chrome compatibility) */
   -webkit-background-clip: text;
+  /* 3. Ensure the text itself is transparent so the background shows through */
   color: transparent;
+  /* 4. Fallback for very old browsers */
+  display: inline-block;
 }
-
 /* Grid Layout for Dropdowns */
 .form-row-2 {
   display: grid;
