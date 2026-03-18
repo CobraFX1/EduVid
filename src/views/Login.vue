@@ -8,7 +8,6 @@
         <p class="auth-sub">Sign in to continue to EduVid</p>
       </div>
 
-      <!-- Google OAuth -->
       <button @click="handleGoogle" class="google-btn" :disabled="loadingGoogle">
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon" />
         <span>{{ loadingGoogle ? 'Signing in...' : 'Continue with Google' }}</span>
@@ -21,8 +20,12 @@
           <label class="field-label">Email address</label>
           <input v-model="email" type="email" class="form-dark" placeholder="name@example.com" required autocomplete="email" />
         </div>
+        
         <div class="field-group">
-          <label class="field-label">Password</label>
+          <div class="password-header">
+            <label class="field-label" style="margin-bottom: 0;">Password</label>
+            <router-link to="/forgot-password" class="forgot-link">Forgot password?</router-link>
+          </div>
           <input v-model="password" type="password" class="form-dark" placeholder="••••••••" required autocomplete="current-password" />
         </div>
 
@@ -71,17 +74,21 @@ const handleLogin = async () => {
 }
 
 const handleGoogle = async () => {
-  errorMessage.value = ''
-  loadingGoogle.value = true
+  loadingGoogle.value = true;
   try {
-    await authStore.loginWithGoogle()
-    router.push('/')
+    const result = await authStore.loginWithGoogle();
+    if (result.isNewUser) {
+      // Send them to a page where they MUST enter their Matric/Programme
+      router.push('/complete-profile'); 
+    } else {
+      router.push('/');
+    }
   } catch (error) {
-    errorMessage.value = error.message
+    errorMessage.value = error.message;
   } finally {
-    loadingGoogle.value = false
+    loadingGoogle.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -123,6 +130,26 @@ const handleGoogle = async () => {
 
 .field-group { margin-bottom: 1.25rem; }
 .field-label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
+
+/* 🛡️ Added: Styles for the Forgot Password Link */
+.password-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.forgot-link {
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+.forgot-link:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
 .field-error {
   background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
   color: #f87171; border-radius: 10px; padding: 0.65rem 1rem;

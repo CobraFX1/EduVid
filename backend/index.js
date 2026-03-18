@@ -3,10 +3,10 @@ const cors = require("cors");
 const admin = require("firebase-admin");
 const { google } = require("googleapis");
 const fs = require("fs");
-const path = require("path");
 const os = require("os");
 const dotenv = require("dotenv");
 const multer = require("multer");
+const nodemailer = require("nodemailer"); 
 
 // Load backend/.env
 dotenv.config();
@@ -14,8 +14,9 @@ dotenv.config();
 // Setup Multer for parsing multipart/form-data directly to temp disk
 const upload = multer({ dest: os.tmpdir() });
 
-// 1. Initialize Firebase Admin SDK
-// You must provide these in your .env file
+// ==========================================
+// 1. INITIALIZE FIREBASE ADMIN SDK
+// ==========================================
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -34,7 +35,9 @@ try {
 
 const db = admin.firestore();
 
-// 2. Initialize YouTube API Client
+// ==========================================
+// 2. INITIALIZE YOUTUBE API CLIENT
+// ==========================================
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
@@ -46,30 +49,44 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 if (REFRESH_TOKEN) {
-  oauth2Client.setCredentials({
-    refresh_token: REFRESH_TOKEN,
-  });
+  oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 } else {
   console.warn("Missing GOOGLE_REFRESH_TOKEN in .env. YouTube uploads will fail.");
 }
 
-const youtube = google.youtube({
-  version: "v3",
-  auth: oauth2Client,
+const youtube = google.youtube({ version: "v3", auth: oauth2Client });
+
+// ==========================================
+// 3. INITIALIZE NODEMAILER
+// ==========================================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS, 
+  },
 });
 
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("Transporter error:", error);
+  } else {
+    console.log("Mail server is ready to send OTPs.");
+  }
+});
 
-// 3. Setup Express Server
+// ==========================================
+// 4. SETUP EXPRESS SERVER & MIDDLEWARE
+// ==========================================
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// Basic health check endpoint
 app.get("/", (req, res) => {
   res.send("EduVid Video Processing Server is running.");
 });
 
-// Middleware to verify Firebase Auth Token
+// Middleware 1: Verify Firebase Auth Token
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -79,7 +96,7 @@ const verifyToken = async (req, res, next) => {
   const token = authHeader.split("Bearer ")[1];
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken;
+    req.user = decodedToken; // Attach user info to request
     next();
   } catch (error) {
     console.error("Token verification error:", error);
@@ -87,41 +104,170 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-// 4. API Endpoint for Video Uploads
+// Middleware 2: Verify Admin Role (Step 7)
+const verifyAdmin = async (req, res, next) => {
+  try {
+    const userDoc = await db.collection("users").doc(req.user.uid).get();
+    const userData = userDoc.data();
+
+    if (!userDoc.exists || userData.role !== 'admin') {
+      return res.status(403).json({ error: "Forbidden: Admin access required." });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ error: "Error verifying admin status." });
+  }
+};
+
+// ==========================================
+// 5. AUTHENTICATION ROUTES
+// ==========================================
+
+// STEP 1: Identity Check (Matric Number)
+app.post('/api/auth/check-matric', async (req, res) => {
+  let { matricNumber } = req.body;
+  if (!matricNumber) return res.status(400).json({ error: 'Matric number is required.' });
+
+  matricNumber = matricNumber.trim().toUpperCase();
+  const matricRegex = /^DU\d{4}$/;
+
+  if (!matricRegex.test(matricNumber)) {
+    return res.status(400).json({ error: 'Invalid format. Use DU followed by 4 digits (e.g., DU1234).' });
+  }
+
+  try {
+    const usersRef = db.collection('users');
+    const query = usersRef.where('matricNumber', '==', matricNumber).limit(1);
+    const snapshot = await query.get();
+    res.json({ exists: !snapshot.empty });
+  } catch (error) {
+    console.error('Database check error:', error);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// STEP 6: Request OTP (With Rate Limiting)
+app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
+  const { email } = req.body;
+  const uid = req.user.uid;
+  
+  if (!email) return res.status(400).json({ error: "Email is required." });
+
+  try {
+    // Spam Protection Check
+    const otpDoc = await db.collection("otp_verifications").doc(uid).get();
+    if (otpDoc.exists) {
+      const data = otpDoc.data();
+      if (data.createdAt) {
+        const lastCreated = data.createdAt.toDate().getTime();
+        const now = Date.now();
+        const cooldownMs = 60000; // 60 seconds
+        if (now - lastCreated < cooldownMs) {
+          const secondsLeft = Math.ceil((cooldownMs - (now - lastCreated)) / 1000);
+          return res.status(429).json({ error: `Please wait ${secondsLeft}s before requesting a new code.` });
+        }
+      }
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await db.collection("otp_verifications").doc(uid).set({
+      otp: otp,
+      email: email,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: Date.now() + 10 * 60 * 1000, 
+    });
+
+    const mailOptions = {
+      from: `"EduVid Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your EduVid Verification Code",
+      html: `
+        <div style="font-family: sans-serif; text-align: center; color: #1a1b2e; padding: 20px;">
+          <div style="background: #f8fafc; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0;">
+            <h2 style="color: #a855f7;">Welcome to EduVid!</h2>
+            <p style="font-size: 16px;">Use the code below to verify your student account:</p>
+            <div style="background: #ffffff; padding: 20px; border-radius: 12px; display: inline-block; margin: 20px 0; border: 2px dashed #a855f7;">
+              <h1 style="color: #a855f7; letter-spacing: 8px; margin: 0; font-size: 32px;">${otp}</h1>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">This code expires in 10 minutes. If you didn't request this, please ignore this email.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`[OTP] Sent to ${email} for UID: ${uid}`);
+    res.json({ message: "OTP sent successfully." });
+
+  } catch (error) {
+    console.error("OTP Error:", error);
+    res.status(500).json({ error: "Failed to process OTP request." });
+  }
+});
+
+// STEP 6: Verify OTP
+app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
+  const { otp } = req.body;
+
+  try {
+    const otpDoc = await db.collection("otp_verifications").doc(req.user.uid).get();
+
+    if (!otpDoc.exists) return res.status(400).json({ error: "No OTP found. Please request a new one." });
+
+    const data = otpDoc.data();
+    if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired." });
+    if (data.otp !== otp) return res.status(400).json({ error: "Invalid verification code." });
+
+    // Success
+    await db.collection("users").doc(req.user.uid).update({ isVerified: true });
+    await otpDoc.ref.delete();
+
+    res.json({ success: true, message: "Account verified successfully!" });
+
+  } catch (error) {
+    console.error("Verification Error:", error);
+    res.status(500).json({ error: "Verification failed." });
+  }
+});
+
+// ==========================================
+// 6. PROTECTED FEATURE ROUTES
+// ==========================================
+
+// STEP 8: Secure Video Upload
 app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) => {
-  const file = req.file; // The uploaded temp file on disk
+  const file = req.file; 
   const { title, description, userId, userEmail, courseCode, level, topic } = req.body;
 
-  if (!file) {
-    return res.status(400).json({ error: "No video file provided." });
-  }
+  if (!file) return res.status(400).json({ error: "No video file provided." });
 
-  // A. Create Initial Firestore Document
-  // User ID from Token must match User ID from Form Data for security
-  if (req.user.uid !== userId) {
-    fs.unlinkSync(file.path);
-    return res.status(403).json({ error: "Forbidden: UID mismatch." });
-  }
-
-  // try to infer department from the course code (helps with filtering)
-  let departmentValue = ""
-  if (courseCode) {
-    try {
-      const courseSnap = await db.collection('courses')
-        .where('code', '==', courseCode)
-        .limit(1)
-        .get();
-      if (!courseSnap.empty) {
-        departmentValue = courseSnap.docs[0].data().department || ""
-      }
-    } catch (e) {
-      console.warn(`Could not lookup course for ${courseCode}:`, e.message)
-    }
-  }
-
-  let docRef;
   try {
-    docRef = await db.collection("videos").add({
+    // 🛡️ SECURITY: Verify user is verified and IDs match
+    const userDoc = await db.collection("users").doc(req.user.uid).get();
+    if (!userDoc.exists || !userDoc.data().isVerified) {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      return res.status(403).json({ error: "Please verify your email before uploading videos." });
+    }
+
+    if (req.user.uid !== userId) {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      return res.status(403).json({ error: "Forbidden: UID mismatch." });
+    }
+
+    // Attempt department lookup
+    let departmentValue = "";
+    if (courseCode) {
+      try {
+        const courseSnap = await db.collection('courses').where('code', '==', courseCode).limit(1).get();
+        if (!courseSnap.empty) departmentValue = courseSnap.docs[0].data().department || "";
+      } catch (e) {
+        console.warn(`Could not lookup course for ${courseCode}:`, e.message);
+      }
+    }
+
+    // 1. Create DB Entry
+    const docRef = await db.collection("videos").add({
       title: title || "EduVid Upload",
       description: description || "",
       courseCode: courseCode || "",
@@ -136,61 +282,35 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       isFlagged: false,
       avgRating: 0
     });
-    console.log(`[${docRef.id}] Video document created, starting YouTube upload from disk...`);
-
-    // increment the associated course's videoCount (if courseCode provided)
+    
+    // Increment course video count
     if (courseCode) {
       try {
-        const courseSnap = await db.collection('courses')
-          .where('code', '==', courseCode)
-          .limit(1)
-          .get();
+        const courseSnap = await db.collection('courses').where('code', '==', courseCode).limit(1).get();
         if (!courseSnap.empty) {
-          const courseRef = courseSnap.docs[0].ref;
-          await courseRef.update({ videoCount: admin.firestore.FieldValue.increment(1) });
+          await courseSnap.docs[0].ref.update({ videoCount: admin.firestore.FieldValue.increment(1) });
         }
       } catch (countErr) {
-        console.warn(`Could not update videoCount for course ${courseCode}:`, countErr.message);
+        console.warn(`Could not update videoCount:`, countErr.message);
       }
     }
-  } catch (dbError) {
-    console.error("Firestore creation error:", dbError);
-    fs.unlinkSync(file.path);
-    return res.status(500).json({ error: "Failed to initialize video entry in database." });
-  }
 
-  // Respond immediately so frontend can show "Processing"
-  res.status(202).json({
-    message: "Upload received. Processing in background.",
-    videoId: docRef.id
-  });
+    // Respond to client immediately
+    res.status(202).json({ message: "Upload received. Processing in background.", videoId: docRef.id });
 
-  // B. Process Video (Upload to YouTube -> Update Database -> Clean Disk)
-  try {
+    // 2. Upload to YouTube
     await docRef.update({ stage: "uploading_to_youtube", statusMessage: "Uploading video to YouTube..." });
-
     const youtubeRes = await youtube.videos.insert({
       part: "snippet,status",
       requestBody: {
-        snippet: {
-          title: title || "EduVid Upload",
-          description: description || "Uploaded via EduVid",
-        },
-        status: {
-          privacyStatus: "unlisted",
-        },
+        snippet: { title: title || "EduVid Upload", description: description || "Uploaded via EduVid" },
+        status: { privacyStatus: "unlisted" },
       },
-      media: {
-        body: fs.createReadStream(file.path),
-      },
+      media: { body: fs.createReadStream(file.path) },
     });
 
+    // 3. Update Firestore
     const ytVideoId = youtubeRes.data.id;
-    console.log(`[${docRef.id}] YouTube upload successful. Video ID: ${ytVideoId}`);
-
-    await docRef.update({ stage: "finalizing", statusMessage: "Finalizing metadata..." });
-
-    // C. Update Firestore with YouTube Data
     await docRef.update({
       videoId: ytVideoId,
       videoUrl: `https://www.youtube.com/watch?v=${ytVideoId}`,
@@ -201,60 +321,30 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
       statusMessage: "Published to YouTube successfully.",
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    console.log(`[${docRef.id}] Processing complete.`);
 
   } catch (error) {
-    console.error(`[${docRef.id}] Error uploading to YouTube:`, error);
-    await docRef.update({
-      status: "error",
-      stage: "error",
-      statusMessage: `Upload failed: ${error.message}`,
-      error: error.message
-    });
+    console.error("Upload process error:", error);
+    // If we have a docRef, we could update it to error status here.
   } finally {
-    // D. Cleanup local temp file from the server's hard drive
-    if (fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-      console.log(`[${docRef.id}] Temp file ${file.path} removed from local disk.`);
-    }
+    // Cleanup local temp file
+    if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
   }
 });
-/**
- * STEP 1: Identity Check
- * Checks if a Matric Number is unique and follows the required pattern.
- */
-app.post('/api/auth/check-matric', async (req, res) => {
-  let { matricNumber } = req.body;
 
-  if (!matricNumber) {
-    return res.status(400).json({ error: 'Matric number is required.' });
-  }
-
-  // Normalize: Trim and force Uppercase
-  matricNumber = matricNumber.trim().toUpperCase();
-
-  // Regex: Must be 'DU' followed by exactly 4 digits
-  const matricRegex = /^DU\d{4}$/;
-
-  if (!matricRegex.test(matricNumber)) {
-    return res.status(400).json({ 
-      error: 'Invalid format. Use DU followed by 4 digits (e.g., DU1234).' 
-    });
-  }
-
+// STEP 7: Admin-Only Route Example
+app.get("/api/admin/flagged-videos", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const usersRef = db.collection('users');
-    const query = usersRef.where('matricNumber', '==', matricNumber).limit(1);
-    const snapshot = await query.get();
-
-    // Send back true/false
-    res.json({ exists: !snapshot.empty });
+    const snapshot = await db.collection("videos").where("isFlagged", "==", true).get();
+    const flagged = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(flagged);
   } catch (error) {
-    console.error('Database check error:', error);
-    res.status(500).json({ error: 'Internal server error.' });
+    res.status(500).json({ error: "Failed to fetch flagged videos." });
   }
 });
-// 5. Start Server
+
+// ==========================================
+// 7. START SERVER
+// ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);

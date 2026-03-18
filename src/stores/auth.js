@@ -8,6 +8,8 @@ import {
     onAuthStateChanged
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
+// Add these to your Firebase imports at the top
+import { sendPasswordResetEmail } from 'firebase/auth'
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -15,8 +17,10 @@ export const useAuthStore = defineStore('auth', {
         userProfile: null,
         loading: true
     }),
+    // Inside your defineStore('auth', { ... })
     getters: {
-        isAdmin: (state) => state.userProfile?.role === 'admin'
+        isAdmin: (state) => state.userProfile?.role === 'admin',
+        isStudent: (state) => state.userProfile?.role === 'student' || !state.userProfile?.role,
     },
     actions: {
         async register(email, password, profileData = {}) {
@@ -46,39 +50,54 @@ export const useAuthStore = defineStore('auth', {
             this.user = userCredential.user;
 
             // 4. Save the extra data to Firestore
-            try { 
-                await this._createUserProfile(userCredential.user, profileData) 
-            } catch (e) { 
-                console.warn('Profile write skipped (check Firestore rules):', e.message) 
+            try {
+                await this._createUserProfile(userCredential.user, profileData)
+            } catch (e) {
+                console.warn('Profile write skipped (check Firestore rules):', e.message)
             }
         },
 
         async loginWithGoogle() {
-            const result = await signInWithPopup(auth, googleProvider)
-            this.user = result.user
-            // Create profile only if it doesn't exist yet
-            const profileRef = doc(db, 'users', result.user.uid)
-            const snap = await getDoc(profileRef)
+            const result = await signInWithPopup(auth, googleProvider);
+            this.user = result.user;
+
+            const profileRef = doc(db, 'users', result.user.uid);
+            const snap = await getDoc(profileRef);
+
             if (!snap.exists()) {
-                await this._createUserProfile(result.user, {})
+                // We DON'T create the profile yet because we don't have their Matric/Programme!
+                // We set a flag so the router knows to redirect them to a setup page.
+                return { isNewUser: true };
             } else {
-                this.userProfile = snap.data()
+                this.userProfile = snap.data();
+                return { isNewUser: false };
             }
         },
-
         async login(email, password) {
             const userCredential = await signInWithEmailAndPassword(auth, email, password)
             this.user = userCredential.user
             try { await this._loadProfile(userCredential.user.uid) }
             catch (e) { console.warn('Profile load skipped:', e.message) }
         },
-
         async logout() {
-            await signOut(auth)
-            this.user = null
-            this.userProfile = null
+            try {
+                await signOut(auth)
+                // 🛡️ CRITICAL: Wipe the memory state clean
+                this.user = null
+                this.userProfile = null
+            } catch (error) {
+                console.error("Logout error:", error.message)
+                throw error
+            }
         },
 
+        async resetPassword(email) {
+            try {
+                await sendPasswordResetEmail(auth, email)
+            } catch (error) {
+                throw error
+            }
+        },
         async _createUserProfile(user, extra = {}) {
             const profile = {
                 uid: user.uid,

@@ -133,6 +133,12 @@ const handleRegister = async () => {
     errorMessage.value = 'Invalid Matric format. Must be DU followed by 4 digits (e.g., DU1234).'
     return
   }
+  
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  if (!passwordRegex.test(password.value)) {
+    errorMessage.value = 'Password must be at least 8 characters, include an uppercase letter and a number.';
+    return;
+  }
 
   loading.value = true
   try {
@@ -142,7 +148,7 @@ const handleRegister = async () => {
       programme: programme.value, // Sending 'programme'
       level: level.value,
     })
-    router.push('/')
+    router.push('/verify-email')
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -151,17 +157,21 @@ const handleRegister = async () => {
 }
 
 const handleGoogle = async () => {
-  loadingGoogle.value = true
+  loadingGoogle.value = true;
   try {
-    await authStore.loginWithGoogle()
-    // First-time Google users should fill in their matric details
-    router.push('/profile?firstLogin=true')
+    const result = await authStore.loginWithGoogle();
+    if (result.isNewUser) {
+      // Send them to a page where they MUST enter their Matric/Programme
+      router.push('/complete-profile'); 
+    } else {
+      router.push('/');
+    }
   } catch (error) {
-    errorMessage.value = error.message
+    errorMessage.value = error.message;
   } finally {
-    loadingGoogle.value = false
+    loadingGoogle.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
