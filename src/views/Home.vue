@@ -73,12 +73,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { db } from '../firebase'
-import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
 import VideoCard from '../components/VideoCard.vue'
 import { useAuthStore } from '../stores/auth'
 
+// 1. State Management
 const authStore = useAuthStore()
 const videos = ref([])
 const loading = ref(true)
@@ -86,8 +87,38 @@ const searchQuery = ref('')
 const filterDept = ref('')
 const filterLevel = ref('')
 const sortBy = ref('recent')
+const unsubscribe = ref(null)
 
-// derive list of departments from current videos for filtering
+// 2. Real-Time Listener Logic
+const startVideoListener = () => {
+  loading.value = true
+  
+  const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'))
+  
+  // onSnapshot handles the initial fetch AND all future updates
+  unsubscribe.value = onSnapshot(q, (snap) => {
+    videos.value = snap.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data() 
+    }))
+    loading.value = false
+  }, (error) => {
+    console.error("Firestore Listener Error:", error)
+    loading.value = false
+  })
+}
+
+// 3. Lifecycle Hooks
+onMounted(() => {
+  startVideoListener()
+})
+
+onUnmounted(() => {
+  // 🛡️ Stop listening to save battery and Firebase usage
+  if (unsubscribe.value) unsubscribe.value()
+})
+
+// 4. Computed Properties (Search, Filter, Sort)
 const departments = computed(() => {
   return [...new Set(videos.value.map(v => v.department).filter(d => !!d))].sort()
 })
@@ -95,6 +126,7 @@ const departments = computed(() => {
 const filteredVideos = computed(() => {
   let vs = videos.value
   const q = searchQuery.value.toLowerCase()
+  
   if (q) {
     vs = vs.filter(v =>
       v.title?.toLowerCase().includes(q) ||
@@ -104,42 +136,28 @@ const filteredVideos = computed(() => {
       v.department?.toLowerCase().includes(q)
     )
   }
+  
   if (filterDept.value) {
     vs = vs.filter(v => v.department === filterDept.value)
   }
+  
   if (filterLevel.value) {
     vs = vs.filter(v => v.level == filterLevel.value)
   }
 
-  // sorting
+  // Sorting logic
   if (sortBy.value === 'trending') {
     vs = [...vs].sort((a, b) => (b.views || 0) - (a.views || 0))
   } else {
     vs = [...vs].sort((a, b) => {
-      const da = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : 0
-      const db = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : 0
+      const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
+      const db = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
       return db - da
     })
   }
   return vs
 })
-
-const fetchVideos = async () => {
-  loading.value = true
-  try {
-    const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'))
-    const snap = await getDocs(q)
-    videos.value = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-  } catch (e) {
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(fetchVideos)
 </script>
-
 <style scoped>
 .page-wrapper { max-width: 1280px; margin: 0 auto; padding: 0 1.5rem 3rem; }
 
