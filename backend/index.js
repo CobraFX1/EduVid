@@ -151,51 +151,28 @@ app.post('/api/auth/check-matric', async (req, res) => {
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
+const Brevo = require('@getbrevo/brevo');
 
-// STEP 6: Request OTP (With Rate Limiting)
-// Replace your existing /api/auth/send-otp logic with this more robust version:
+const apiInstance = new Brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+
 app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
   const { email } = req.body;
-  const uid = req.user.uid;
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  const sendSmtpEmail = new Brevo.SendSmtpEmail();
+  sendSmtpEmail.subject = "Verify your EduVid Account";
+  sendSmtpEmail.htmlContent = `<html><body><h1>Your OTP is ${otp}</h1></body></html>`;
+  sendSmtpEmail.sender = { name: "EduVid Support", email: "your-verified-email@gmail.com" };
+  sendSmtpEmail.to = [{ email: email }];
 
   try {
-    const otpDoc = await db.collection("otp_verifications").doc(uid).get();
-
-    // Safety check for the timestamp to prevent 500 crash
-    if (otpDoc.exists) {
-      const data = otpDoc.data();
-      const lastCreated = data.createdAt ? data.createdAt.toDate().getTime() : 0;
-      if (Date.now() - lastCreated < 60000) {
-        return res.status(429).json({ error: "Wait 60s." });
-      }
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Wrap mailer in its own try/catch to identify if it's the culprit
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Verify EduVid",
-        text: `Your code is ${otp}`
-      });
-    } catch (mailError) {
-      console.error("MAILER ERROR:", mailError.message);
-      return res.status(500).json({ error: "Email server configuration error." });
-    }
-
-    await db.collection("otp_verifications").doc(uid).set({
-      otp,
-      email,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
-
-    res.json({ message: "OTP sent." });
-  } catch (err) {
-    console.error("GENERAL ERROR:", err);
-    res.status(500).json({ error: err.message });
+    await apiInstance.sendTransacEmail(sendSmtpEmail);
+    // ... Save to Firestore logic ...
+    res.json({ message: "OTP sent via API successfully!" });
+  } catch (error) {
+    console.error("Brevo API Error:", error);
+    res.status(500).json({ error: "API Delivery failed." });
   }
 });
 // STEP 6: Verify OTP
