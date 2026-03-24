@@ -11,7 +11,7 @@ dotenv.config();
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  privateKey: process.env.FIREBASE_PRIVATE_KEY3?.replace(/\\n/g, '\n'),
 };
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
@@ -40,11 +40,21 @@ const courses = [
 
 (async () => {
   const batch = db.batch();
+  
+  // 1. Seed unique departments
+  const uniqueDepts = [...new Set(courses.map(c => c.department))];
+  for (const dept of uniqueDepts) {
+    const ref = db.collection('departments').doc();
+    batch.set(ref, { name: dept, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  }
+
+  // 2. Seed courses
   for (const course of courses) {
     const ref = db.collection('courses').doc();
     batch.set(ref, { ...course, videoCount: 0, createdAt: admin.firestore.FieldValue.serverTimestamp() });
   }
+  
   await batch.commit();
-  console.log(`✅  Seeded ${courses.length} courses into Firestore.`);
+  console.log(`✅  Seeded ${uniqueDepts.length} departments and ${courses.length} courses into Firestore.`);
   process.exit(0);
 })();

@@ -94,10 +94,10 @@
 
             <div class="comment-list">
               <div v-for="c in comments" :key="c.id" class="comment-item">
-                <div class="comment-avatar">{{ (c.userEmail || 'U')[0].toUpperCase() }}</div>
+                <div class="comment-avatar">{{ ((c.userName || c.userEmail) || 'U')[0].toUpperCase() }}</div>
                 <div class="comment-body">
                   <div class="comment-header">
-                    <span class="comment-author">{{ c.userEmail }}</span>
+                    <span class="comment-author">{{ c.userName || (c.userEmail?.split('@')[0]) }}</span>
                     <span class="comment-date">{{ formatDate(c.createdAt) }}</span>
                   </div>
                   <p class="comment-text">{{ c.text }}</p>
@@ -170,12 +170,12 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, getDocs, addDoc, updateDoc,
-  query, orderBy, where, serverTimestamp, increment, limit
+  query, orderBy, where, serverTimestamp, increment, limit, onSnapshot, arrayUnion
 } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
 
@@ -228,24 +228,46 @@ watch(() => route.params.id, (newId) => {
 
 // --- Logic Functions ---
 
-const loadComments = async () => {
-  const snap = await getDocs(query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc')))
-  comments.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  loadingComments.value = false
+let unsubComments = null
+
+const loadComments = () => {
+  unsubComments = onSnapshot(query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc')), (snap) => {
+    comments.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    loadingComments.value = false
+  })
 }
+
+onUnmounted(() => {
+  if (unsubComments) unsubComments()
+})
 
 const loadRecommendations = async (currentVideo) => {
   try {
-    const courseQuery = query(collection(db, 'videos'), where('courseCode', '==', currentVideo.courseCode), where('status', '==', 'ready'), limit(8))
-    const courseSnap = await getDocs(courseQuery)
-    let results = courseSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId)
+    let results = []
+    
+    // 1. By Course
+    if (currentVideo.courseCode) {
+      const courseQuery = query(collection(db, 'videos'), where('courseCode', '==', currentVideo.courseCode), where('status', '==', 'ready'), limit(8))
+      const courseSnap = await getDocs(courseQuery)
+      results = courseSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId)
+    }
 
-    if (results.length < 3) {
+    // 2. By Department
+    if (results.length < 3 && currentVideo.department) {
       const deptQuery = query(collection(db, 'videos'), where('department', '==', currentVideo.department), where('status', '==', 'ready'), limit(8))
       const deptSnap = await getDocs(deptQuery)
       const deptResults = deptSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId && !results.some(r => r.id === v.id))
       results = [...results, ...deptResults].slice(0, 6)
     }
+    
+    // 3. Fallback to generic Recent
+    if (results.length < 3) {
+      const recentQuery = query(collection(db, 'videos'), where('status', '==', 'ready'), limit(6))
+      const recentSnap = await getDocs(recentQuery)
+      const recentResults = recentSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.id !== videoId && !results.some(r => r.id === v.id))
+      results = [...results, ...recentResults].slice(0, 6)
+    }
+    
     relatedVideos.value = results
   } catch (err) { console.error("Recommendation Error:", err) }
 }
@@ -285,9 +307,10 @@ const submitComment = async () => {
     text: newComment.value.trim(),
     userId: authStore.user.uid,
     userEmail: authStore.user.email,
+    userName: authStore.userProfile?.name || authStore.user.displayName || '',
     createdAt: serverTimestamp()
   })
-  newComment.value = ''; submittingComment.value = false; await loadComments()
+  newComment.value = ''; submittingComment.value = false;
 }
 
 const submitRating = async (stars) => {
@@ -314,7 +337,10 @@ const submitFlag = async () => {
     userEmail: authStore.user.email,
     createdAt: serverTimestamp()
   })
-  await updateDoc(doc(db, 'videos', videoId), { isFlagged: true })
+  await updateDoc(doc(db, 'videos', videoId), { 
+    isFlagged: true,
+    flaggedReasons: arrayUnion(flagReason.value)
+  })
   video.value.isFlagged = true; submittingFlag.value = false; showFlagModal.value = false
 }
 
@@ -418,7 +444,8 @@ const formatDate = (ts) => {
 .comments-title { font-size: 1rem; font-weight: 700; margin: 0 0 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
 .count-chip { background: rgba(108,99,255,0.12); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 0.75rem; }
 .add-comment { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1.5rem; }
-.comment-input { flex: 1; resize: none; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 0.75rem; }
+.comment-input { flex: 1; resize: none; background: rgba(108,99,255,0.05); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); padding: 0.75rem; transition: all 0.2s; }
+.comment-input:focus { background: rgba(108,99,255,0.1); outline: none; border-color: var(--accent); }
 .comment-submit { padding: 0.5rem 1.25rem; border-radius: 10px; font-weight: 600; }
 
 .comment-list { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -453,14 +480,26 @@ const formatDate = (ts) => {
 .field-group { margin-bottom: 1.25rem; }
 .field-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
 .form-input { 
-  width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); 
-  border: 1px solid var(--border); border-radius: 8px; color: white; outline: none;
+  width: 100%; padding: 0.75rem; background: rgba(108,99,255,0.05); 
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); outline: none; transition: all 0.2s;
 }
-.form-input:focus { border-color: var(--accent); }
+.form-input:focus { border-color: var(--accent); background: rgba(108,99,255,0.1); }
 
 .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
-.btn-delete { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 10px; padding: 0.6rem 1.25rem; font-weight: 600; cursor: pointer; }
+.btn-delete { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 10px; padding: 0.6rem 1.25rem; font-weight: 600; cursor: pointer; transition: background 0.2s;}
 .btn-delete:hover { background: rgba(239,68,68,0.25); }
+
+/* Flag Options CSS */
+.flag-options { display: flex; flex-direction: column; gap: 0.6rem; margin: 1.5rem 0; }
+.flag-option { 
+  display: flex; align-items: center; gap: 0.75rem; 
+  padding: 0.8rem 1rem; border: 1px solid var(--border); 
+  border-radius: 10px; cursor: pointer; transition: all 0.2s;
+  background: rgba(255,255,255,0.02); color: var(--text-primary);
+}
+.flag-option:hover { background: var(--bg-card-hover); border-color: rgba(251,191,36,0.3); }
+.flag-option input { margin: 0; width: 1.1rem; height: 1.1rem; accent-color: #fbbf24; cursor: pointer; flex-shrink: 0;}
+.flag-option span { font-size: 0.95rem; font-weight: 500; }
 
 /* Status & Utils */
 .status-pill { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 10px; border-radius: 999px; }

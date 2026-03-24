@@ -6,12 +6,13 @@
         <span>EduVid</span>
       </router-link>
 
-      <div class="nav-links" v-if="authStore.user">
-        <router-link to="/" class="nav-link-item">Home</router-link>
-        <router-link to="/courses" class="nav-link-item">Courses</router-link>
-        <router-link to="/upload" class="nav-link-item">Upload</router-link>
-        <router-link to="/my-videos" class="nav-link-item">My Videos</router-link>
-        <router-link v-if="authStore.isAdmin" to="/admin" class="nav-link-item admin-link">Admin</router-link>
+      <!-- Desktop Links -->
+      <div class="nav-links default-desktop" v-if="authStore.user">
+        <router-link to="/" class="nav-link-item" @click="menuOpen = false">Home</router-link>
+        <router-link to="/courses" class="nav-link-item" @click="menuOpen = false">Courses</router-link>
+        <router-link to="/upload" class="nav-link-item" @click="menuOpen = false">Upload</router-link>
+        <router-link to="/my-videos" class="nav-link-item" @click="menuOpen = false">My Videos</router-link>
+        <router-link v-if="authStore.isAdmin" to="/admin" class="nav-link-item admin-link" @click="menuOpen = false">Admin</router-link>
       </div>
 
       <div class="nav-actions">
@@ -21,7 +22,7 @@
         </button>
 
         <template v-if="authStore.user">
-          <div class="user-menu">
+          <div class="user-menu default-desktop">
             <router-link to="/profile" class="user-avatar-link" title="Profile">
               <img
                 :src="authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`"
@@ -34,14 +35,39 @@
               <i class="bi bi-box-arrow-right"></i>
             </button>
           </div>
+          
+          <!-- Hamburger Button -->
+          <button class="mobile-menu-btn" @click="menuOpen = !menuOpen">
+            <i class="bi" :class="menuOpen ? 'bi-x-lg' : 'bi-list'"></i>
+          </button>
         </template>
+
         <template v-else>
-          <router-link to="/login" class="btn-glass">Login</router-link>
-          <router-link to="/register" class="btn-gradient">Sign Up</router-link>
+          <router-link to="/login" class="btn-glass default-desktop">Login</router-link>
+          <router-link to="/register" class="btn-gradient default-desktop">Sign Up</router-link>
         </template>
       </div>
     </div>
   </nav>
+
+  <!-- Mobile Drawer correctly scoped as root sibling -->
+  <div class="mobile-drawer-overlay" :class="{ 'drawer-open': menuOpen }" v-if="authStore.user">
+    <router-link to="/profile" class="drawer-user" style="text-decoration: none;" @click="menuOpen = false">
+      <img :src="authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`" class="drawer-avatar" />
+      <div style="display: flex; flex-direction: column;">
+        <span class="drawer-name">{{ authStore.userProfile?.name || authStore.user.email?.split('@')[0] }}</span>
+        <span style="font-size: 0.85rem; color: var(--accent); font-weight: 500; margin-top: 0.2rem;">View Profile & Settings</span>
+      </div>
+    </router-link>
+    <div class="drawer-links">
+      <router-link to="/" class="drawer-link" @click="menuOpen = false"><i class="bi bi-house me-3"></i>Home</router-link>
+      <router-link to="/courses" class="drawer-link" @click="menuOpen = false"><i class="bi bi-book me-3"></i>Courses</router-link>
+      <router-link to="/upload" class="drawer-link" @click="menuOpen = false"><i class="bi bi-cloud-arrow-up me-3"></i>Upload</router-link>
+      <router-link to="/my-videos" class="drawer-link" @click="menuOpen = false"><i class="bi bi-camera-video me-3"></i>My Videos</router-link>
+      <router-link v-if="authStore.isAdmin" to="/admin" class="drawer-link admin-link" @click="menuOpen = false"><i class="bi bi-shield-lock me-3"></i>Admin</router-link>
+    </div>
+    <button @click="handleLogout(); menuOpen = false;" class="drawer-logout"><i class="bi bi-box-arrow-right me-3"></i>Sign out</button>
+  </div>
 
   <main class="main-content">
     <router-view></router-view>
@@ -60,6 +86,7 @@ import { useRouter } from 'vue-router'
 const authStore = useAuthStore()
 const router = useRouter()
 const isDark = ref(true)
+const menuOpen = ref(false)
 
 onMounted(() => {
   const saved = localStorage.getItem('theme')
@@ -166,5 +193,36 @@ const handleLogout = async () => {
   border-top: 1px solid var(--border);
   padding: 1.25rem; text-align: center;
   color: var(--text-secondary); font-size: 0.8rem;
+}
+
+/* Mobile Responsive Classes */
+.default-desktop { display: flex; }
+.mobile-menu-btn { display: none; background: transparent; border: none; font-size: 1.6rem; color: var(--text-primary); cursor: pointer; padding: 0.2rem; }
+.mobile-drawer-overlay { display: none; }
+
+@media (max-width: 860px) {
+  .default-desktop { display: none !important; }
+  .mobile-menu-btn { display: block; }
+  
+  .mobile-drawer-overlay {
+    display: flex; flex-direction: column;
+    position: fixed; inset: 0; top: 64px;
+    background: var(--bg-primary); z-index: 9999;
+    padding: 2rem 1.5rem; overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .drawer-open { transform: translateX(0); }
+  
+  .drawer-user { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .drawer-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(108,99,255,0.4); }
+  .drawer-name { font-weight: 700; font-size: 1.15rem; color: var(--text-primary); }
+  
+  .drawer-links { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; margin-bottom: 2rem; }
+  .drawer-link { display: flex; align-items: center; padding: 1rem; font-size: 1.1rem; font-weight: 500; color: var(--text-secondary); text-decoration: none; border-radius: 12px; transition: background 0.2s, color 0.2s; }
+  .drawer-link:hover, .drawer-link.router-link-active { background: rgba(108,99,255,0.1); color: var(--text-primary); }
+  
+  .drawer-logout { margin-top: auto; padding: 1.25rem; font-size: 1.1rem; font-weight: 600; color: #f87171; background: transparent; border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; cursor: pointer; text-align: left; transition: background 0.2s; }
+  .drawer-logout:hover { background: rgba(248,113,113,0.1); }
 }
 </style>

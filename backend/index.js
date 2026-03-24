@@ -346,7 +346,62 @@ app.get("/api/admin/flagged-videos", verifyToken, verifyAdmin, async (req, res) 
 });
 
 // ==========================================
-// 7. START SERVER
+// 7. NODE-CRON YOUTUBE SYNCHRONIZATION
+// ==========================================
+const cron = require("node-cron");
+
+// Run every hour to continuously verify if live videos were deleted off YouTube manually
+cron.schedule("0 * * * *", async () => {
+  console.log("[CRON] Running YouTube Broken Link Synchronization...");
+  try {
+    const vidsRef = db.collection("videos");
+    const snapshot = await vidsRef.where("status", "==", "ready").get();
+    
+    if (snapshot.empty) return console.log("[CRON] No active videos to sync.");
+
+    // Map out Document references mapped by videoId
+    const ytIdMap = new Map();
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.videoId) ytIdMap.set(data.videoId, doc.ref);
+    });
+
+    const videoIds = Array.from(ytIdMap.keys());
+    
+    // Chunk array into batches of 50 (YouTube API Hard Limit)
+    const chunkSize = 50;
+    for (let i = 0; i < videoIds.length; i += chunkSize) {
+      const chunk = videoIds.slice(i, i + chunkSize);
+      
+      const res = await youtube.videos.list({
+        part: "status",
+        id: chunk.join(","),
+      });
+
+      // YouTube API gently omits data for deleted/ghost videos!
+      const activeIds = res.data.items.map((item) => item.id);
+      
+      for (const reqId of chunk) {
+        if (!activeIds.includes(reqId)) {
+          console.log(`[CRON] De-Platformed ghost link detected: ${reqId}`);
+          
+          await ytIdMap.get(reqId).update({
+            brokenLink: true,
+            isFlagged: true,
+            status: "error",
+            statusMessage: "Video removed from YouTube",
+          });
+        }
+      }
+    }
+    console.log("[CRON] Sync Complete.");
+  } catch (error) {
+    console.error("[CRON] Sync Failed:", error.message);
+  }
+});
+
+// ==========================================
+// 8. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

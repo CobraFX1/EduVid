@@ -115,8 +115,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { auth } from '../firebase'
+import { ref, computed, watch, onMounted } from 'vue'
+import { auth, db } from '../firebase'
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { useRouter } from 'vue-router'
 
 const title = ref('')
@@ -133,25 +134,37 @@ const error = ref('')
 const isDragging = ref(false)
 const router = useRouter()
 
-// Standardized Lists for Sorting
-const departments = [
-  'Software Engineering',
-  'Computer Science',
-  'Cyber Security',
-  'Information Technology'
-]
+const courseDatabase = ref({})
+const customDepartments = ref([])
 
-// Master list of courses categorized by department
-// Master list of courses categorized by department
-const courseDatabase = {
-  'Software Engineering': ['SEN401', 'SEN403', 'SEN404', 'SEN405', 'SEN407', 'SEN409', 'SEN411'],
-  'Computer Science': ['CSC101', 'CSC201', 'CSC301', 'CSC401'],
-  'Cyber Security': ['CYB201', 'CYB301', 'CYB401'],
-  'Information Technology': ['IFT201', 'IFT301', 'IFT401']
-}
+const departments = computed(() => {
+  return [...customDepartments.value].sort()
+})
 
 const filteredCourses = computed(() => {
-  return department.value ? courseDatabase[department.value] : []
+  return department.value ? courseDatabase.value[department.value] || [] : []
+})
+
+onMounted(() => {
+  const qCourses = query(collection(db, 'courses'), orderBy('code'))
+  const unsubCourses = onSnapshot(qCourses, (snap) => {
+    const dbData = {}
+    snap.docs.forEach(doc => {
+      const { department, code } = doc.data()
+      if (department && code) {
+        if (!dbData[department]) dbData[department] = []
+        dbData[department].push(code)
+      }
+    })
+    courseDatabase.value = dbData
+  })
+
+  const qDepts = query(collection(db, 'departments'))
+  const unsubDepts = onSnapshot(qDepts, (snap) => {
+    customDepartments.value = snap.docs.map(d => d.data().name).filter(Boolean)
+  })
+
+  return () => { unsubCourses(); unsubDepts() }
 })
 
 watch(department, () => {

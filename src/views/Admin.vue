@@ -1,11 +1,18 @@
 <template>
   <div class="admin-page">
     <div class="admin-header">
-      <div>
+      <div class="header-left">
         <h1 class="admin-title">Admin <span class="gradient-text">Dashboard</span></h1>
-        <p class="admin-sub">{{ videos.length }} total videos · Real-time pipeline status</p>
+        
+        <div class="admin-tabs">
+          <button @click="activeTab = 'videos'" :class="{ active: activeTab === 'videos' }" class="tab-btn">Video Pipeline</button>
+          <button @click="activeTab = 'courses'" :class="{ active: activeTab === 'courses' }" class="tab-btn">Curriculum Manager</button>
+          <button @click="activeTab = 'users'" :class="{ active: activeTab === 'users' }" class="tab-btn">User Directory</button>
+          <button @click="activeTab = 'moderation'" :class="{ active: activeTab === 'moderation' }" class="tab-btn">Moderation Queue</button>
+          <button @click="activeTab = 'broken'" :class="{ active: activeTab === 'broken' }" class="tab-btn">Broken Links</button>
+        </div>
       </div>
-      <div class="admin-filters">
+      <div v-if="activeTab === 'videos'" class="admin-filters">
         <button
           v-for="f in filters"
           :key="f.key"
@@ -22,82 +29,105 @@
       </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="state-center">
-      <div class="spinner"></div>
-    </div>
+    <!-- Video Pipeline Tab Content -->
+    <div v-if="activeTab === 'videos'">
+      <!-- Loading -->
+      <div v-if="loading" class="state-center">
+        <div class="spinner"></div>
+      </div>
 
-    <!-- Empty -->
-    <div v-else-if="filteredVideos.length === 0" class="state-center">
-      <i class="bi bi-inbox" style="font-size:2.5rem; color:var(--accent); opacity:0.4;"></i>
-      <p style="color:var(--text-secondary); margin-top:0.75rem;">No videos in this category.</p>
-    </div>
+      <!-- Empty -->
+      <div v-else-if="filteredVideos.length === 0" class="state-center">
+        <i class="bi bi-inbox" style="font-size:2.5rem; color:var(--accent); opacity:0.4;"></i>
+        <p style="color:var(--text-secondary); margin-top:0.75rem;">No videos in this category.</p>
+      </div>
 
-    <!-- Table -->
-    <div v-else class="admin-table-wrap">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Video</th>
-            <th>Stage</th>
-            <th>Status</th>
-            <th>Uploader</th>
-            <th>Uploaded</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="video in filteredVideos" :key="video.id" class="table-row">
-            <td class="col-video">
-              <div class="video-thumb-wrap">
-                <img v-if="video.thumbnailUrl" :src="video.thumbnailUrl" class="vid-thumb" alt="" />
-                <div v-else class="vid-thumb-placeholder"><i class="bi bi-film"></i></div>
-              </div>
-              <div class="video-info">
-                <p class="vid-title">{{ video.title }}</p>
-                <p class="vid-id">ID: {{ video.id }}</p>
-              </div>
-            </td>
-            <td class="col-stage">
-              <div class="stage-wrap">
-                <div class="stage-icon" :class="stageClass(video)">
-                  <i :class="stageIcon(video)"></i>
+      <!-- Table -->
+      <div v-else class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Video</th>
+              <th>Stage</th>
+              <th>Status</th>
+              <th>Uploader</th>
+              <th>Uploaded</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="video in filteredVideos" :key="video.id" class="table-row">
+              <td class="col-video">
+                <div class="video-thumb-wrap">
+                  <img v-if="video.thumbnailUrl" :src="video.thumbnailUrl" class="vid-thumb" alt="" />
+                  <div v-else class="vid-thumb-placeholder"><i class="bi bi-film"></i></div>
                 </div>
-                <span class="stage-label">{{ video.statusMessage || stageLabel(video) }}</span>
-              </div>
-            </td>
-            <td>
-              <span class="status-pill" :class="pillClass(video.status)">{{ video.status }}</span>
-            </td>
-            <td class="col-user">
-              <span class="user-chip">{{ video.userEmail }}</span>
-            </td>
-            <td class="col-date">{{ formatDate(video.createdAt) }}</td>
-            <td class="col-actions">
-              <a
-                v-if="video.videoId"
-                :href="`https://www.youtube.com/watch?v=${video.videoId}`"
-                target="_blank"
-                class="action-btn yt-btn"
-                title="View on YouTube"
-              >
-                <i class="bi bi-youtube"></i>
-              </a>
-              <button
-                @click="deleteVideo(video)"
-                class="action-btn del-btn"
-                title="Delete from Firestore"
-              >
-                <i class="bi bi-trash3"></i>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <div class="video-info">
+                  <p class="vid-title">{{ video.title }}</p>
+                  <p class="vid-id">ID: {{ video.id }}</p>
+                </div>
+              </td>
+              <td class="col-stage">
+                <div class="stage-wrap">
+                  <div class="stage-icon" :class="stageClass(video)">
+                    <i :class="stageIcon(video)"></i>
+                  </div>
+                  <span class="stage-label">{{ video.statusMessage || stageLabel(video) }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="status-pill" :class="pillClass(video.status)">{{ video.status }}</span>
+              </td>
+              <td class="col-user">
+                <span class="user-chip">{{ video.userEmail }}</span>
+              </td>
+              <td class="col-date">{{ formatDate(video.createdAt) }}</td>
+              <td class="col-actions">
+                <a
+                  v-if="video.videoId"
+                  :href="`https://www.youtube.com/watch?v=${video.videoId}`"
+                  target="_blank"
+                  class="action-btn yt-btn"
+                  title="View on YouTube"
+                >
+                  <i class="bi bi-youtube"></i>
+                </a>
+                <button
+                  @click="deleteVideo(video)"
+                  class="action-btn del-btn"
+                  title="Delete from Firestore"
+                >
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- Stats cards -->
-    <div class="stats-row">
+    <!-- Course Management Tab -->
+    <div v-if="activeTab === 'courses'">
+      <CourseManager />
+    </div>
+
+    <!-- User Directory -->
+    <div v-if="activeTab === 'users'">
+      <UserManager />
+    </div>
+
+    <!-- Moderation Queue -->
+    <div v-if="activeTab === 'moderation'">
+      <ModerationQueue />
+    </div>
+
+    <!-- Broken Links -->
+    <div v-if="activeTab === 'broken'">
+      <BrokenLinks />
+    </div>
+
+    <!-- Stats cards (Videos specific) -->
+    <div v-if="activeTab === 'videos'" class="stats-row">
       <div class="stat-card glass-card" v-for="stat in stats" :key="stat.label">
         <div class="stat-value" :style="{ color: stat.color }">{{ stat.value }}</div>
         <div class="stat-label">{{ stat.label }}</div>
@@ -111,7 +141,12 @@ import { ref, computed, onMounted } from 'vue'
 import { db } from '../firebase'
 import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore'
 import { decrementCourseCount } from '../utils/course'
+import CourseManager from '../components/CourseManager.vue'
+import UserManager from '../components/UserManager.vue'
+import ModerationQueue from '../components/ModerationQueue.vue'
+import BrokenLinks from '../components/BrokenLinks.vue'
 
+const activeTab = ref('videos')
 const videos = ref([])
 const loading = ref(true)
 const activeFilter = ref('all')
@@ -209,11 +244,21 @@ onMounted(fetchVideos)
 .admin-page { max-width: 1280px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
 .admin-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  flex-wrap: wrap; gap: 1.25rem; margin-bottom: 2rem;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  flex-wrap: wrap; gap: 1.25rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem;
 }
+.header-left { display: flex; flex-direction: column; gap: 1rem; }
 .admin-title { font-size: 1.8rem; font-weight: 800; margin: 0; }
 .admin-sub { color: var(--text-secondary); font-size: 0.875rem; margin: 0.25rem 0 0; }
+
+.admin-tabs { display: flex; gap: 1.5rem; }
+.tab-btn {
+  background: transparent; border: none; color: var(--text-secondary);
+  font-size: 0.95rem; font-weight: 600; cursor: pointer; padding: 0 0 0.5rem;
+  border-bottom: 2px solid transparent; transition: all 0.2s; position: relative; top: 1.5rem;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .admin-filters { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .filter-btn {
@@ -328,4 +373,15 @@ onMounted(fetchVideos)
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+/* Mobile Optimizations */
+@media (max-width: 860px) {
+  .admin-header { flex-direction: column; align-items: flex-start; }
+  .admin-tabs { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { white-space: nowrap; flex-shrink: 0; }
+  .admin-table-wrap { overflow-x: auto; }
+  .admin-table { min-width: 800px; }
+  .stats-row { grid-template-columns: 1fr; }
+}
 </style>

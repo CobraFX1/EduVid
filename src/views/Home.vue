@@ -53,9 +53,8 @@
         <button @click="resetFilters" class="btn-text-only">Clear All Filters</button>
       </div>
 
-      <div v-if="loading" class="state-center">
-        <div class="spinner"></div>
-        <p>Syncing with campus feed...</p>
+      <div v-if="loading" class="video-grid">
+        <SkeletonVideo v-for="n in 8" :key="n" />
       </div>
 
       <div v-else-if="filteredVideos.length === 0" class="state-center">
@@ -78,6 +77,7 @@ import { useRoute, useRouter } from 'vue-router' // Step 8 Imports
 import { db } from '../firebase'
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
 import VideoCard from '../components/VideoCard.vue'
+import SkeletonVideo from '../components/SkeletonVideo.vue'
 import { useAuthStore } from '../stores/auth'
 
 // --- 1. Router & Auth State ---
@@ -127,19 +127,26 @@ watch([searchQuery, filterDept, filterCourse, filterLevel, sortBy], () => {
 }, { deep: true })
 
 // --- 6. Lifecycle Hooks ---
-onMounted(() => startVideoListener())
-onUnmounted(() => { if (unsubscribe.value) unsubscribe.value() })
+onMounted(() => {
+  startVideoListener()
+  startDeptListener()
+})
+onUnmounted(() => { 
+  if (unsubscribe.value) unsubscribe.value() 
+  if (unsubDepts) unsubDepts()
+})
 
 // --- 7. Metadata Framework Logic (Step 7) ---
+const customDepartments = ref([])
+const departments = computed(() => customDepartments.value)
+let unsubDepts = null
+const startDeptListener = () => {
+  unsubDepts = onSnapshot(query(collection(db, 'departments')), snap => {
+    let data = snap.docs.map(d => d.data().name).filter(Boolean)
+    customDepartments.value = data.sort()
+  })
+}
 
-// Get unique departments available in the current video list
-// Replace the old computed 'departments' with this static array
-const departments = [
-  'Software Engineering',
-  'Computer Science',
-  'Cyber Security',
-  'Information Technology'
-]
 // Dependent Filter: Only show course codes matching the selected department
 const availableCourseCodes = computed(() => {
   if (!filterDept.value || videos.value.length === 0) return []
@@ -171,7 +178,8 @@ const resetFilters = () => {
 
 // --- 8. Chained Filtering Engine ---
 const filteredVideos = computed(() => {
-  let vs = videos.value
+  // HIDDEN BUG FIX: Enforce 'ready' state to prevent processing/failed video leakage
+  let vs = videos.value.filter(v => v.status === 'ready')
   const q = searchQuery.value.toLowerCase().trim()
   
   // A. Search Bar (Title, Topic, or Code)

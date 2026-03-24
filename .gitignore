@@ -25,3 +25,9 @@ dist-ssr
 backend/.env
 backend/client_secret.json
 eduvid-code.zip
+
+chapter_four.md
+deployment-steps.md
+future_improvements.md
+eduvid_roadmap.md
+DEPLOYMENT.md

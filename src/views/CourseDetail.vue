@@ -53,9 +53,11 @@ const loading = ref(true)
 
 const fetchVideos = async () => {
   const snap = await getDocs(
-    query(collection(db, 'videos'), where('courseCode', '==', route.params.code), orderBy('createdAt', 'desc'))
+    query(collection(db, 'videos'), where('courseCode', '==', route.params.code), where('status', '==', 'ready'))
   )
-  videos.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const results = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  results.sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+  videos.value = results
 }
 
 onMounted(async () => {

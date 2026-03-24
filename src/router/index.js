@@ -1,32 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
-import Login from '../views/Login.vue'
-import Register from '../views/Register.vue'
-import Upload from '../views/Upload.vue'
-import Admin from '../views/Admin.vue'
-import Courses from '../views/Courses.vue'
-import CourseDetail from '../views/CourseDetail.vue'
-import Watch from '../views/Watch.vue'
-import MyVideos from '../views/MyVideos.vue'
-import Profile from '../views/Profile.vue'
-import CompleteProfile from '../views/CompleteProfile.vue' // 1. Import it
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
     { path: '/', name: 'Home', component: Home },
-    { path: '/login', name: 'Login', component: Login },
-    { path: '/register', name: 'Register', component: Register },
-    { path: '/courses', name: 'Courses', component: Courses },
-    { path: '/courses/:code', name: 'CourseDetail', component: CourseDetail },
-    { path: '/watch/:id', name: 'Watch', component: Watch },
-    { path: '/upload', name: 'Upload', component: Upload, meta: { requiresAuth: true } },
-    { path: '/my-videos', name: 'MyVideos', component: MyVideos, meta: { requiresAuth: true } },
-    { path: '/profile', name: 'Profile', component: Profile, meta: { requiresAuth: true } },
-    { path: '/admin', name: 'Admin', component: Admin, meta: { requiresAuth: true } },
+    { path: '/login', name: 'Login', component: () => import('../views/Login.vue') },
+    { path: '/register', name: 'Register', component: () => import('../views/Register.vue') },
+    { path: '/courses', name: 'Courses', component: () => import('../views/Courses.vue') },
+    { path: '/courses/:code', name: 'CourseDetail', component: () => import('../views/CourseDetail.vue') },
+    { path: '/watch/:id', name: 'Watch', component: () => import('../views/Watch.vue') },
+    { path: '/upload', name: 'Upload', component: () => import('../views/Upload.vue'), meta: { requiresAuth: true } },
+    { path: '/my-videos', name: 'MyVideos', component: () => import('../views/MyVideos.vue'), meta: { requiresAuth: true } },
+    { path: '/profile', name: 'Profile', component: () => import('../views/Profile.vue'), meta: { requiresAuth: true } },
+    { path: '/admin', name: 'Admin', component: () => import('../views/Admin.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
     {
         path: '/complete-profile',
         name: 'CompleteProfile',
-        component: CompleteProfile,
+        component: () => import('../views/CompleteProfile.vue'),
         meta: { requiresAuth: true }
     },
     {

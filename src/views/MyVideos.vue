@@ -41,9 +41,6 @@
           <router-link v-if="video.videoId" :to="`/watch/${video.id}`" class="action-btn watch-btn" title="Watch">
             <i class="bi bi-play-circle"></i>
           </router-link>
-          <a v-if="video.videoId" :href="`https://www.youtube.com/watch?v=${video.videoId}`" target="_blank" class="action-btn yt-btn" title="YouTube">
-            <i class="bi bi-youtube"></i>
-          </a>
           <button @click="deleteVideo(video)" class="action-btn del-btn" title="Delete">
             <i class="bi bi-trash3"></i>
           </button>
@@ -66,13 +63,25 @@ const loading = ref(true)
 
 const fetchVideos = async () => {
   loading.value = true
-  const snap = await getDocs(
-    query(collection(db, 'videos'),
-      where('userId', '==', authStore.user.uid),
-      orderBy('createdAt', 'desc'))
-  )
-  videos.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  loading.value = false
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'videos'), where('userId', '==', authStore.user.uid))
+    )
+    let data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    
+    // Sort locally to completely bypass Firestore's missing composite index
+    data.sort((a,b) => {
+      const t1 = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0)
+      const t2 = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0)
+      return t2 - t1
+    })
+    
+    videos.value = data
+  } catch(e) {
+    console.error("Fetch Error:", e)
+  } finally {
+    loading.value = false
+  }
 }
 
 const deleteVideo = async (video) => {

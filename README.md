@@ -1,109 +1,92 @@
-# EduVid
+# EduVid: University Instructional Video Platform
 
-**EduVid** is a peer‑to‑peer educational video platform built for Dominion University. It lets students upload curriculum‑aligned lecture recordings, browse by course, rate clarity, comment on content, and explore a community‑driven video catalog. Behind the scenes an Express backend handles uploads to YouTube and Firestore stores metadata and user profiles.
-
----
-
-## 🚀 Features
-
-- Vue 3 frontend powered by Vite
-- Firebase authentication with email/password and Google OAuth
-- Extended registration with matric number, department, and level
-- Firestore collections for users, videos, courses, comments, ratings, and flags
-- Video upload studio that processes files, publishes to YouTube, and tracks status
-- Course catalog with search, filters, and individual course pages
-- Home feed with trending (by views) and recent sorting, plus department/level filters
-- Video playback page with YouTube embed, related content, comments, clarity ratings, flagging, and view tracking
-- User dashboard (`My Contributions`) showing personal uploads, flags, and ratings
-- Profile settings and role‑based admin dashboard
-- Express backend that verifies Firebase tokens and interacts with YouTube Data API
-- Seeder script for populating initial course list
-
-## 📁 Project Structure
-
-```
-eduvid/
-├─ backend/                # Express server, upload logic, Firestore seeder
-├─ public/                 # Static assets
-├─ src/                    # Vue application
-│  ├─ components/          # Reusable UI components
-│  ├─ router/              # Vue Router configuration
-│  ├─ stores/              # Pinia stores (auth)
-│  ├─ views/               # Page-level Vue components
-│  ├─ utils/               # Helper modules
-│  ├─ firebase.js          # Firebase initialization
-│  └─ main.js              # App entrypoint
-└─ eduvid_roadmap.md       # Development roadmap
-```
-
-## 🛠️ Setup Instructions
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn
-- Firebase project with Firestore and Authentication enabled
-- YouTube Data API credentials for upload
-
-### Backend
-
-1. `cd backend`
-2. Create a `.env` file with your Firebase and Google credentials:
-   ```ini
-   FIREBASE_PROJECT_ID=...
-   FIREBASE_CLIENT_EMAIL=...
-   FIREBASE_PRIVATE_KEY="..."
-   GOOGLE_CLIENT_ID=...
-   GOOGLE_CLIENT_SECRET=...
-   GOOGLE_REFRESH_TOKEN=...
-   ```
-3. Install dependencies and start server:
-   ```bash
-   npm install
-   npm run start          # listens on port 3000
-   ```
-4. (Optional) Seed courses:
-   ```bash
-   node seed-courses.js
-   ```
-
-### Frontend
-
-1. At the root of the repo, install dependencies:
-   ```bash
-   npm install
-   ```
-2. Copy `src/firebase.js` and update with your Firebase config.
-3. Run development server:
-   ```bash
-   npm run dev
-   ```
-4. The app will be available at `http://localhost:5173` by default.
-
-### Deployment
-
-- Frontend can be built with `npm run build` and hosted on any static host
-- Backend should run on a Node environment (Heroku, Vercel serverless, EC2, etc.)
-- Make sure to set environment variables and secure the Google refresh token
-
-## 🧭 Roadmap
-
-The project roadmap lives in `eduvid_roadmap.md`. Highlights:
-
-1. **Authentication & Onboarding** – complete
-2. **Course Catalog & Discovery** – mostly complete
-3. **Video Playback & Peer Interaction** – implemented
-4. **Upload Studio & Contributions** – implemented
-5. **Admin Governance** – partial (needs moderation queue, user management)
-
-## 🤝 Contributing
-
-Feel free to fork, open issues, or submit pull requests. The code uses ESLint with default config and Prettier for formatting.
-
-## 📄 License
-
-This project is open‑source and available under the MIT License.
+**EduVid** is a high-performance, responsive Vue 3 application tailored for academic environments. It provides a centralized hub for instructional video sharing, featuring real-time data synchronization via Firebase and an automated Node.js microservice architecture for content integrity.
 
 ---
 
-_EduVid — Dominion University Peer‑to‑Peer Learning Platform_
-alri
+## 🏗️ Architecture & Tech Stack
+
+EduVid is built with a focus on modularity and "Zero-Jank" performance.
+
+* **Frontend**: [Vue 3](https://vuejs.org/) (Composition API) powered by [Vite](https://vitejs.dev/) for lightning-fast HMR.
+* **State Management**: [Pinia](https://pinia.vuejs.org/) for modular, type-safe reactive stores.
+* **Backend-as-a-Service**: [Firebase](https://firebase.google.com/) (Firestore, Authentication, and Cloud Storage).
+* **Microservices**: [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) hosting a custom CRON engine for YouTube link validation.
+* **UI/UX**: Custom **Glassmorphism Design System** authored in pure CSS3, utilizing Vue Teleports and Skeleton Loaders for seamless transitions.
+
+---
+
+## 🌟 Key Features
+
+### 🔐 Secure Governance
+* **Role-Based Access Control (RBAC)**: Granular permissions system distinguishing between Student and Administrator roles to secure sensitive routes and actions.
+* **Firebase Authentication**: Robust OAuth and email/password integration for campus-wide security.
+
+### 📺 Content Moderation & Automation
+* **Automated Sync Engine**: A Node.js backend that runs recurring validation checks to identify and flag dead YouTube links or private videos.
+* **Advanced Flagging**: Community-driven moderation tools with manual Administrator override capabilities.
+
+### 📊 Engagement Analytics
+* **Live Metrics**: Real-time watch tracking and rating matrices.
+* **Native Integration**: Seamless YouTube iFrame API implementation for high-fidelity playback control.
+
+---
+
+## 🛠️ Installation & Setup
+
+Follow these steps to configure your local development environment.
+
+### 1. Repository Initialization
+Clone the repository and install the frontend dependencies:
+```bash
+git clone [https://github.com/your-username/eduvid.git](https://github.com/your-username/eduvid.git)
+cd eduvid
+npm install
+```
+
+### 2. Microservice Configuration
+Navigate to the backend directory to initialize the CRON engine:
+```bash
+cd backend
+npm install
+```
+
+### 3. Environment Variables
+Create a `.env.local` file in the `src/` directory. Populate it with your Firebase configuration keys:
+```env
+VITE_FIREBASE_API_KEY=your_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+---
+
+## 🚀 Running the Application
+
+To fully utilize the platform's features, both the frontend and the backend sync engine must be active.
+
+### Frontend Development Server
+From the root directory:
+```bash
+npm run dev
+```
+
+### Background Verification Engine
+Open a separate terminal and navigate to the backend folder:
+```bash
+cd backend
+node index.js
+```
+
+---
+
+## 📈 Deployment
+This project is optimized for deployment on **Vercel** or **Netlify** (Frontend) and **Heroku** or **Google Cloud Functions** (Backend). Ensure all environment variables are mirrored in your production dashboard.
+
+---
+
+Would you like me to generate a **License** section or a **Contribution Guide** to add to the bottom of this file?
+```

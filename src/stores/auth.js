@@ -5,7 +5,7 @@ import {
     signInWithEmailAndPassword,
     signInWithPopup,
     signOut,
-    onAuthStateChanged
+    onIdTokenChanged
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 // Add these to your Firebase imports at the top
@@ -121,11 +121,14 @@ export const useAuthStore = defineStore('auth', {
 
         initializeAuth() {
             return new Promise((resolve) => {
-                onAuthStateChanged(auth, async (user) => {
+                // onIdTokenChanged automatically handles silent token refreshes every hour!
+                onIdTokenChanged(auth, async (user) => {
                     this.user = user
                     if (user) {
                         try { await this._loadProfile(user.uid) }
                         catch (e) { console.warn('Profile load skipped:', e.message) }
+                    } else {
+                        this.userProfile = null
                     }
                     this.loading = false
                     resolve()
