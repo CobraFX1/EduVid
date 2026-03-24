@@ -59,25 +59,25 @@ const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 // ==========================================
 // 3. INITIALIZE NODEMAILER
 // ==========================================
+
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // Use SSL
+  host: process.env.EMAIL_HOST || "smtp-relay.brevo.com",
+  port: parseInt(process.env.EMAIL_PORT) || 587,
+  secure: false, // Use STARTTLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  // THIS IS THE KEY: Force IPv4
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
+  // Increase timeouts for cloud reliability
+  connectionTimeout: 15000, 
+  greetingTimeout: 15000,
 });
 
 transporter.verify((error, success) => {
   if (error) {
-    console.error("Transporter error:", error);
+    console.error("Brevo Transporter Error:", error.message);
   } else {
-    console.log("Mail server is ready to send OTPs.");
+    console.log("Brevo is ready to deliver EduVid OTPs.");
   }
 });
 
