@@ -76,6 +76,12 @@
   <footer class="eduvid-footer">
     <p>© {{ new Date().getFullYear() }} EduVid. All rights reserved.</p>
   </footer>
+
+  <!-- Server Wake Up Toast -->
+  <div v-if="serverSpinningUp" class="server-status-toast glass-card">
+    <i class="bi bi-arrow-repeat spin" style="font-size: 1.2rem; color: var(--accent)"></i>
+    <span>Waking up secure server...</span>
+  </div>
 </template>
 
 <script setup>
@@ -87,6 +93,7 @@ const authStore = useAuthStore()
 const router = useRouter()
 const isDark = ref(true)
 const menuOpen = ref(false)
+const serverSpinningUp = ref(true)
 
 onMounted(() => {
   const saved = localStorage.getItem('theme')
@@ -94,6 +101,11 @@ onMounted(() => {
     isDark.value = false
     document.documentElement.setAttribute('data-theme', 'light')
   }
+
+  // Wake up backend and handle Spin Up delay
+  fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/`)
+    .then(() => { serverSpinningUp.value = false })
+    .catch(() => { serverSpinningUp.value = false })
 })
 
 const toggleTheme = () => {
@@ -224,5 +236,31 @@ const handleLogout = async () => {
   
   .drawer-logout { margin-top: auto; padding: 1.25rem; font-size: 1.1rem; font-weight: 600; color: #f87171; background: transparent; border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; cursor: pointer; text-align: left; transition: background 0.2s; }
   .drawer-logout:hover { background: rgba(248,113,113,0.1); }
+}
+
+/* Server Status Toast */
+.server-status-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--bg-card);
+  border: 1px solid rgba(108,99,255,0.3);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  font-weight: 500;
+  color: var(--text-primary);
+  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes slideUp {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 </style>

@@ -132,7 +132,7 @@ const handleVerify = async () => {
 
     const token = await currentUser.getIdToken()
     
-    const response = await fetch('http://localhost:3000/api/auth/verify-otp', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/verify-otp`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ const resendOtp = async () => {
 
     const token = await currentUser.getIdToken()
     
-    const response = await fetch('http://localhost:3000/api/auth/send-otp', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/send-otp`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',

@@ -33,7 +33,7 @@ export const useAuthStore = defineStore('auth', {
             }
 
             // 2. Perform the Uniqueness Check against the Database
-            const response = await fetch('http://localhost:3000/api/auth/check-matric', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/check-matric`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matricNumber: rawMatric })

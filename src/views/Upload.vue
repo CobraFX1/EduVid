@@ -227,7 +227,7 @@ const uploadVideo = async () => {
 
     // ... (rest of your XHR logic remains the same)
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', 'http://localhost:3000/api/upload', true)
+    xhr.open('POST', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/upload`, true)
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     xhr.upload.onprogress = (event) => {
