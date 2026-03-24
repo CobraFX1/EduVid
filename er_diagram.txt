@@ -1,0 +1,79 @@
+**EduVid Firestore Database Schema (ER Diagram representation)**
+
+*Below is the exact data architecture currently used in your application based on the Firestore collections.*
+
+---
+### 1. Users Collection (`users`)
+Stores information about registered students and admins.
+- **uid**: String (Document ID)
+- **email**: String
+- **name**: String
+- **matricNumber**: String
+- **programme**: String
+- **level**: Number / String
+- **role**: String (e.g., 'student', 'admin')
+- **isVerified**: Boolean
+- **photoURL**: String (recently added for profile uploads)
+- **createdAt**: Timestamp
+
+---
+### 2. Videos Collection (`videos`)
+Stores details of the educational videos uploaded.
+- **videoId**: String (Document ID)
+- **title**: String
+- **description**: String
+- **department**: String
+- **courseCode**: String (Links to Courses Collection)
+- **level**: Number
+- **topic**: String
+- **userId**: String (Links to Users Collection)
+- **userEmail**: String
+- **thumbnailUrl**: String
+- **videoUrl**: String
+- **status**: String ('ready', 'processing')
+- **views**: Number
+- **avgRating**: Number
+- **isFlagged**: Boolean
+- **flaggedReasons**: Array of Strings
+- **createdAt**: Timestamp
+
+---
+### 3. Courses Collection (`courses`)
+Categorizes videos by course code (acting similarly to a Categories table).
+- **courseId**: String (Document ID)
+- **code**: String (e.g., 'CSC101')
+- **department**: String
+- **videoCount**: Number
+
+---
+### 4. Departments Collection (`departments`)
+List of available departments for users and courses.
+- **departmentId**: String (Document ID)
+- **name**: String
+
+---
+### 5. Comments Sub-Collection (`videos/{videoId}/comments`)
+Captures user comments on specific videos.
+- **commentId**: String (Document ID)
+- **text**: String
+- **userId**: String (Links to Users Collection)
+- **userName**: String
+- **userEmail**: String
+- **createdAt**: Timestamp
+
+---
+### 6. Ratings Sub-Collection (`videos/{videoId}/ratings`)
+Tracks individual star ratings for videos.
+- **ratingId**: String (Document ID)
+- **userId**: String (Links to Users Collection)
+- **rating**: Number
+- **createdAt**: Timestamp
+
+---
+### 7. Flags Sub-Collection (`videos/{videoId}/flags`)
+Tracks reports on inappropriate or inaccurate videos.
+- **flagId**: String (Document ID)
+- **userId**: String (Links to Users Collection)
+- **userEmail**: String
+- **reason**: String
+- **createdAt**: Timestamp

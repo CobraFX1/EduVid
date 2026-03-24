@@ -8,7 +8,23 @@
     <div class="profile-layout">
       <!-- Avatar card -->
       <div class="avatar-card glass-card">
-        <div class="profile-avatar">{{ initials }}</div>
+        <div class="profile-avatar-container" @click="triggerFileInput">
+          <div class="profile-avatar">
+            <template v-if="uploadingImage">
+              <i class="bi bi-arrow-repeat spin"></i>
+            </template>
+            <template v-else-if="authStore.userProfile?.photoURL">
+              <img :src="authStore.userProfile.photoURL" alt="Profile Avatar" class="avatar-image" />
+            </template>
+            <template v-else>
+              {{ initials }}
+            </template>
+          </div>
+          <div class="avatar-overlay">
+            <i class="bi bi-camera-fill"></i>
+          </div>
+          <input ref="fileInput" type="file" accept="image/*" @change="handleImageUpload" hidden />
+        </div>
         <p class="avatar-name">{{ form.name || authStore.user?.email }}</p>
         <p class="avatar-email">{{ authStore.user?.email }}</p>
         <span class="role-badge" :class="{ 'admin-badge': authStore.isAdmin }">
@@ -99,6 +115,67 @@ const form = ref({
   level: ''
 })
 
+const fileInput = ref(null)
+const uploadingImage = ref(false)
+
+const triggerFileInput = () => {
+  if (fileInput.value) {
+    fileInput.value.click()
+  }
+}
+
+const handleImageUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  if (!file.type.startsWith('image/')) {
+    error.value = 'Please select an image file.'
+    return
+  }
+  
+  uploadingImage.value = true
+  error.value = ''
+  
+  try {
+    const formData = new FormData()
+    formData.append('image', file)
+    
+    // Read API key from Vite environment variables
+    const apiKey = import.meta.env.VITE_IMGBB_API_KEY
+    if (!apiKey) {
+      throw new Error('ImgBB API key is missing. Please add VITE_IMGBB_API_KEY to your .env/env.local file.')
+    }
+    
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    const data = await response.json()
+    
+    if (data.success) {
+      const imageUrl = data.data.url
+      
+      // Update Firestore
+      await updateDoc(doc(db, 'users', authStore.user.uid), {
+        photoURL: imageUrl
+      })
+      
+      // Update local store
+      authStore.userProfile = { ...authStore.userProfile, photoURL: imageUrl }
+      saved.value = true
+      setTimeout(() => saved.value = false, 3000)
+    } else {
+      throw new Error(data.error?.message || 'Failed to upload image to ImgBB')
+    }
+  } catch (e) {
+    error.value = `Image upload failed: ${e.message}`
+  } finally {
+    uploadingImage.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
 const initials = computed(() => {
   const n = form.value.name || authStore.user?.email || 'U'
   return n.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -155,11 +232,32 @@ const handleLogout = async () => {
 @media (max-width: 700px) { .profile-layout { grid-template-columns: 1fr; } }
 
 .avatar-card { padding: 2rem 1.5rem; text-align: center; position: sticky; top: 80px; }
+.profile-avatar-container {
+  position: relative;
+  width: 70px; height: 70px;
+  margin: 0 auto 1rem;
+  cursor: pointer;
+  border-radius: 50%;
+}
 .profile-avatar {
-  width: 70px; height: 70px; border-radius: 50%;
+  width: 100%; height: 100%; border-radius: 50%;
   background: linear-gradient(135deg, #6c63ff, #a855f7);
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.4rem; font-weight: 800; color: #fff; margin: 0 auto 1rem;
+  font-size: 1.4rem; font-weight: 800; color: #fff;
+  overflow: hidden;
+}
+.avatar-image {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.avatar-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: center;
+  color: white; opacity: 0; transition: opacity 0.2s ease;
+  border-radius: 50%;
+}
+.profile-avatar-container:hover .avatar-overlay {
+  opacity: 1;
 }
 .avatar-name { font-weight: 700; color: var(--text-primary); margin: 0; font-size: 0.95rem; }
 .avatar-email { color: var(--text-secondary); font-size: 0.75rem; margin: 0.25rem 0 0.75rem; word-break: break-all; }

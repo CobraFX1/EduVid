@@ -25,7 +25,7 @@
           <div class="user-menu default-desktop">
             <router-link to="/profile" class="user-avatar-link" title="Profile">
               <img
-                :src="authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`"
+                :src="authStore.userProfile?.photoURL || authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`"
                 class="user-avatar"
                 alt="Avatar"
               />
@@ -53,7 +53,7 @@
   <!-- Mobile Drawer correctly scoped as root sibling -->
   <div class="mobile-drawer-overlay" :class="{ 'drawer-open': menuOpen }" v-if="authStore.user">
     <router-link to="/profile" class="drawer-user" style="text-decoration: none;" @click="menuOpen = false">
-      <img :src="authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`" class="drawer-avatar" />
+      <img :src="authStore.userProfile?.photoURL || authStore.user.photoURL || `https://ui-avatars.com/api/?name=${authStore.user.email}&background=6c63ff&color=fff`" class="drawer-avatar" />
       <div style="display: flex; flex-direction: column;">
         <span class="drawer-name">{{ authStore.userProfile?.name || authStore.user.email?.split('@')[0] }}</span>
         <span style="font-size: 0.85rem; color: var(--accent); font-weight: 500; margin-top: 0.2rem;">View Profile & Settings</span>

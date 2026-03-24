@@ -147,65 +147,51 @@ app.post('/api/auth/check-matric', async (req, res) => {
 });
 
 // STEP 6: Request OTP (With Rate Limiting)
+// Replace your existing /api/auth/send-otp logic with this more robust version:
 app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
   const { email } = req.body;
   const uid = req.user.uid;
 
-  if (!email) return res.status(400).json({ error: "Email is required." });
-
   try {
-    // Spam Protection Check
     const otpDoc = await db.collection("otp_verifications").doc(uid).get();
+
+    // Safety check for the timestamp to prevent 500 crash
     if (otpDoc.exists) {
       const data = otpDoc.data();
-      if (data.createdAt) {
-        const lastCreated = data.createdAt.toDate().getTime();
-        const now = Date.now();
-        const cooldownMs = 60000; // 60 seconds
-        if (now - lastCreated < cooldownMs) {
-          const secondsLeft = Math.ceil((cooldownMs - (now - lastCreated)) / 1000);
-          return res.status(429).json({ error: `Please wait ${secondsLeft}s before requesting a new code.` });
-        }
+      const lastCreated = data.createdAt ? data.createdAt.toDate().getTime() : 0;
+      if (Date.now() - lastCreated < 60000) {
+        return res.status(429).json({ error: "Wait 60s." });
       }
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Wrap mailer in its own try/catch to identify if it's the culprit
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Verify EduVid",
+        text: `Your code is ${otp}`
+      });
+    } catch (mailError) {
+      console.error("MAILER ERROR:", mailError.message);
+      return res.status(500).json({ error: "Email server configuration error." });
+    }
+
     await db.collection("otp_verifications").doc(uid).set({
-      otp: otp,
-      email: email,
+      otp,
+      email,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
-    const mailOptions = {
-      from: `"EduVid Support" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your EduVid Verification Code",
-      html: `
-        <div style="font-family: sans-serif; text-align: center; color: #1a1b2e; padding: 20px;">
-          <div style="background: #f8fafc; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0;">
-            <h2 style="color: #a855f7;">Welcome to EduVid!</h2>
-            <p style="font-size: 16px;">Use the code below to verify your student account:</p>
-            <div style="background: #ffffff; padding: 20px; border-radius: 12px; display: inline-block; margin: 20px 0; border: 2px dashed #a855f7;">
-              <h1 style="color: #a855f7; letter-spacing: 8px; margin: 0; font-size: 32px;">${otp}</h1>
-            </div>
-            <p style="color: #64748b; font-size: 14px;">This code expires in 10 minutes. If you didn't request this, please ignore this email.</p>
-          </div>
-        </div>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`[OTP] Sent to ${email} for UID: ${uid}`);
-    res.json({ message: "OTP sent successfully." });
-
-  } catch (error) {
-    console.error("OTP Error:", error);
-    res.status(500).json({ error: "Failed to process OTP request." });
+    res.json({ message: "OTP sent." });
+  } catch (err) {
+    console.error("GENERAL ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
-
 // STEP 6: Verify OTP
 app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
   const { otp } = req.body;
@@ -289,9 +275,9 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
     const youtubeRes = await youtube.videos.insert({
       part: "snippet,status",
       requestBody: {
-        snippet: { 
-          title: title, 
-          description: description || `Educational content for ${courseCode} via EduVid` 
+        snippet: {
+          title: title,
+          description: description || `Educational content for ${courseCode} via EduVid`
         },
         status: { privacyStatus: "unlisted" },
       },
@@ -356,7 +342,7 @@ cron.schedule("0 * * * *", async () => {
   try {
     const vidsRef = db.collection("videos");
     const snapshot = await vidsRef.where("status", "==", "ready").get();
-    
+
     if (snapshot.empty) return console.log("[CRON] No active videos to sync.");
 
     // Map out Document references mapped by videoId
@@ -367,12 +353,12 @@ cron.schedule("0 * * * *", async () => {
     });
 
     const videoIds = Array.from(ytIdMap.keys());
-    
+
     // Chunk array into batches of 50 (YouTube API Hard Limit)
     const chunkSize = 50;
     for (let i = 0; i < videoIds.length; i += chunkSize) {
       const chunk = videoIds.slice(i, i + chunkSize);
-      
+
       const res = await youtube.videos.list({
         part: "status",
         id: chunk.join(","),
@@ -380,11 +366,11 @@ cron.schedule("0 * * * *", async () => {
 
       // YouTube API gently omits data for deleted/ghost videos!
       const activeIds = res.data.items.map((item) => item.id);
-      
+
       for (const reqId of chunk) {
         if (!activeIds.includes(reqId)) {
           console.log(`[CRON] De-Platformed ghost link detected: ${reqId}`);
-          
+
           await ytIdMap.get(reqId).update({
             brokenLink: true,
             isFlagged: true,

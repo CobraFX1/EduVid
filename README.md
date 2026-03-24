@@ -85,8 +85,3 @@ node index.js
 
 ## 📈 Deployment
 This project is optimized for deployment on **Vercel** or **Netlify** (Frontend) and **Heroku** or **Google Cloud Functions** (Backend). Ensure all environment variables are mirrored in your production dashboard.
-
----
-
-Would you like me to generate a **License** section or a **Contribution Guide** to add to the bottom of this file?
-```
