@@ -117,11 +117,59 @@ app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
     // 2. The new V5 syntax passes a simple JSON object directly!
     await brevo.transactionalEmails.sendTransacEmail({
       subject: "Verify your EduVid Account",
-      htmlContent: `<html><body><h1>Your OTP is ${otp}</h1></body></html>`,
-      sender: { name: "EduVid Support", email: "jacobstephen045@gmail.com" }, // Must be verified in Brevo
-      to: [{ email: email }]
+      to: [{ email: email }],
+      sender: { name: "EduVid Support", email: "YOUR_VERIFIED_BREVO_EMAIL@gmail.com" }, // Keep your verified email here
+      htmlContent: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6;">
+          
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+            
+            <tr>
+              <td align="center" style="background-color: #4F46E5; padding: 30px 20px;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px;">EduVid</h1>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 40px 30px; color: #374151;">
+                <h2 style="margin-top: 0; color: #111827; font-size: 20px;">Verify your email address</h2>
+                <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+                  Hello,<br><br>
+                  Thank you for registering for EduVid! To complete your setup and access the platform, please enter the verification code below:
+                </p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                  <span style="display: inline-block; background-color: #EEF2FF; color: #4F46E5; font-size: 32px; font-weight: bold; letter-spacing: 5px; padding: 15px 30px; border-radius: 6px; border: 1px dashed #4F46E5;">
+                    ${otp}
+                  </span>
+                </div>
+
+                <p style="font-size: 14px; color: #6B7280; line-height: 1.5;">
+                  This code will expire in <strong>10 minutes</strong>. If you did not request this code, please ignore this email or contact support.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="background-color: #F9FAFB; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">
+                <p style="margin: 0; font-size: 12px; color: #9CA3AF;">
+                  &copy; ${new Date().getFullYear()} EduVid. All rights reserved.
+                </p>
+              </td>
+            </tr>
+            
+          </table>
+          
+        </body>
+        </html>
+      `
     });
-    
     // 3. Save OTP to Firestore
     await db.collection("otp_verifications").doc(req.user.uid).set({
       otp: otp,
