@@ -6,7 +6,6 @@ const fs = require("fs");
 const os = require("os");
 const dotenv = require("dotenv");
 const multer = require("multer");
-const nodemailer = require("nodemailer");
 
 // Load backend/.env
 dotenv.config();
@@ -56,30 +55,6 @@ if (REFRESH_TOKEN) {
 
 const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
-// ==========================================
-// 3. INITIALIZE NODEMAILER
-// ==========================================
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp-relay.brevo.com",
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false, // Use STARTTLS
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // Increase timeouts for cloud reliability
-  connectionTimeout: 15000, 
-  greetingTimeout: 15000,
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("Brevo Transporter Error:", error.message);
-  } else {
-    console.log("Brevo is ready to deliver EduVid OTPs.");
-  }
-});
 
 // ==========================================
 // 4. SETUP EXPRESS SERVER & MIDDLEWARE
@@ -124,55 +99,40 @@ const verifyAdmin = async (req, res, next) => {
     res.status(500).json({ error: "Error verifying admin status." });
   }
 };
-
 // ==========================================
-// 5. AUTHENTICATION ROUTES
+// 5. AUTHENTICATION ROUTES (Brevo V5 SDK)
 // ==========================================
+const { BrevoClient } = require('@getbrevo/brevo');
 
-// STEP 1: Identity Check (Matric Number)
-app.post('/api/auth/check-matric', async (req, res) => {
-  let { matricNumber } = req.body;
-  if (!matricNumber) return res.status(400).json({ error: 'Matric number is required.' });
-
-  matricNumber = matricNumber.trim().toUpperCase();
-  const matricRegex = /^DU\d{4}$/;
-
-  if (!matricRegex.test(matricNumber)) {
-    return res.status(400).json({ error: 'Invalid format. Use DU followed by 4 digits (e.g., DU1234).' });
-  }
-
-  try {
-    const usersRef = db.collection('users');
-    const query = usersRef.where('matricNumber', '==', matricNumber).limit(1);
-    const snapshot = await query.get();
-    res.json({ exists: !snapshot.empty });
-  } catch (error) {
-    console.error('Database check error:', error);
-    res.status(500).json({ error: 'Internal server error.' });
-  }
+// 1. Initialize the new unified client
+const brevo = new BrevoClient({ 
+  apiKey: process.env.EMAIL_PASS
 });
-const Brevo = require('@getbrevo/brevo');
-
-const apiInstance = new Brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
 app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  const sendSmtpEmail = new Brevo.SendSmtpEmail();
-  sendSmtpEmail.subject = "Verify your EduVid Account";
-  sendSmtpEmail.htmlContent = `<html><body><h1>Your OTP is ${otp}</h1></body></html>`;
-  sendSmtpEmail.sender = { name: "EduVid Support", email: "your-verified-email@gmail.com" };
-  sendSmtpEmail.to = [{ email: email }];
-
   try {
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
-    // ... Save to Firestore logic ...
-    res.json({ message: "OTP sent via API successfully!" });
+    // 2. The new V5 syntax passes a simple JSON object directly!
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject: "Verify your EduVid Account",
+      htmlContent: `<html><body><h1>Your OTP is ${otp}</h1></body></html>`,
+      sender: { name: "EduVid Support", email: "jacobstephen045@gmail.com" }, // Must be verified in Brevo
+      to: [{ email: email }]
+    });
+    
+    // 3. Save OTP to Firestore
+    await db.collection("otp_verifications").doc(req.user.uid).set({
+      otp: otp,
+      expiresAt: Date.now() + 600000, // 10 minutes
+    });
+
+    res.json({ message: "OTP sent successfully!" });
   } catch (error) {
-    console.error("Brevo API Error:", error);
-    res.status(500).json({ error: "API Delivery failed." });
+    // V5 error handling
+    console.error("Brevo API Error:", error.body || error.message);
+    res.status(500).json({ error: "Failed to send OTP." });
   }
 });
 // STEP 6: Verify OTP
