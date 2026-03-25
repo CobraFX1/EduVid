@@ -118,7 +118,7 @@ app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
     await brevo.transactionalEmails.sendTransacEmail({
       subject: "Verify your EduVid Account",
       to: [{ email: email }],
-      sender: { name: "EduVid Support", email: "YOUR_VERIFIED_BREVO_EMAIL@gmail.com" }, // Keep your verified email here
+      sender: { name: "EduVid Support", email: "jacobstephen045@gmail.com" }, // Keep your verified email here
       htmlContent: `
         <!DOCTYPE html>
         <html>
