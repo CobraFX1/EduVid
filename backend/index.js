@@ -185,29 +185,57 @@ app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
 });
 // STEP 6: Verify OTP
 app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
-  const { otp } = req.body;
+  const { otp, matricNumber } = req.body; // Expecting matricNumber from the frontend here
+
+  if (!otp || !matricNumber) {
+    return res.status(400).json({ error: "OTP and Matric Number are required." });
+  }
+
+  const normalizedMatric = matricNumber.trim().toUpperCase();
 
   try {
+    // 1. Check if this matric number is already verified by another UID
+    const duplicateQuery = await db.collection("users")
+      .where("matricNumber", "==", normalizedMatric)
+      .where("isVerified", "==", true)
+      .limit(1)
+      .get();
+
+    if (!duplicateQuery.empty) {
+      return res.status(400).json({ error: "This matric number is already linked to another verified account." });
+    }
+
+    // 2. Fetch the OTP record
     const otpDoc = await db.collection("otp_verifications").doc(req.user.uid).get();
 
     if (!otpDoc.exists) return res.status(400).json({ error: "No OTP found. Please request a new one." });
 
     const data = otpDoc.data();
+    
+    // 3. Validation Logic
     if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired." });
     if (data.otp !== otp) return res.status(400).json({ error: "Invalid verification code." });
 
-    // Success
-    await db.collection("users").doc(req.user.uid).update({ isVerified: true });
+    // 4. Success - Finalize the user profile
+    await db.collection("users").doc(req.user.uid).set({
+      uid: req.user.uid,
+      email: req.user.email,
+      matricNumber: normalizedMatric,
+      isVerified: true,
+      role: 'student', // Default role
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    // Cleanup
     await otpDoc.ref.delete();
 
-    res.json({ success: true, message: "Account verified successfully!" });
+    res.json({ success: true, message: "Account verified and matric number linked successfully!" });
 
   } catch (error) {
     console.error("Verification Error:", error);
     res.status(500).json({ error: "Verification failed." });
   }
 });
-
 // ==========================================
 // 6. PROTECTED FEATURE ROUTES
 // ==========================================
