@@ -55,6 +55,22 @@ if (REFRESH_TOKEN) {
 
 const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
+// ==========================================
+// 3. RETRY HELPER (Exponential Backoff)
+// ==========================================
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isRetryable = error.code === 429 || error.code === 503 || error.code === 'ECONNRESET' || error.message?.includes('timeout');
+      if (!isRetryable || attempt === maxRetries) throw error;
+      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 500;
+      console.log(`[Retry] Attempt ${attempt} failed. Retrying in ${Math.round(delay)}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
 
 // ==========================================
 // 4. SETUP EXPRESS SERVER & MIDDLEWARE
@@ -185,62 +201,48 @@ app.post("/api/auth/send-otp", verifyToken, async (req, res) => {
 });
 // STEP 6: Verify OTP
 app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
-  const { otp, matricNumber } = req.body; // Expecting matricNumber from the frontend here
-
-  if (!otp || !matricNumber) {
-    return res.status(400).json({ error: "OTP and Matric Number are required." });
-  }
-
-  const normalizedMatric = matricNumber.trim().toUpperCase();
+  const { otp } = req.body;
 
   try {
-    // 1. Check if this matric number is already verified by another UID
-    const duplicateQuery = await db.collection("users")
-      .where("matricNumber", "==", normalizedMatric)
-      .where("isVerified", "==", true)
-      .limit(1)
-      .get();
-
-    if (!duplicateQuery.empty) {
-      return res.status(400).json({ error: "This matric number is already linked to another verified account." });
-    }
-
-    // 2. Fetch the OTP record
     const otpDoc = await db.collection("otp_verifications").doc(req.user.uid).get();
 
     if (!otpDoc.exists) return res.status(400).json({ error: "No OTP found. Please request a new one." });
 
     const data = otpDoc.data();
-    
-    // 3. Validation Logic
     if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired." });
     if (data.otp !== otp) return res.status(400).json({ error: "Invalid verification code." });
 
-    // 4. Success - Finalize the user profile
-    await db.collection("users").doc(req.user.uid).set({
-      uid: req.user.uid,
-      email: req.user.email,
-      matricNumber: normalizedMatric,
-      isVerified: true,
-      role: 'student', // Default role
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // Cleanup
+    // Success
+    await db.collection("users").doc(req.user.uid).update({ isVerified: true });
     await otpDoc.ref.delete();
 
-    res.json({ success: true, message: "Account verified and matric number linked successfully!" });
+    res.json({ success: true, message: "Account verified successfully!" });
 
   } catch (error) {
     console.error("Verification Error:", error);
     res.status(500).json({ error: "Verification failed." });
   }
 });
+
+// ==========================================
+// 5.5 MATRIC CHECK ROUTE
+// ==========================================
+app.post("/api/auth/check-matric", async (req, res) => {
+  const { matricNumber } = req.body;
+  if (!matricNumber) return res.status(400).json({ error: "Matric number is required." });
+  try {
+    const snap = await db.collection("users").where("matricNumber", "==", matricNumber).get();
+    res.json({ exists: !snap.empty });
+  } catch (error) {
+    console.error("Matric check error:", error);
+    res.status(500).json({ error: "Failed to check matric number." });
+  }
+});
+
 // ==========================================
 // 6. PROTECTED FEATURE ROUTES
 // ==========================================
 
-// STEP 8: Secure Video Upload
 // STEP 8: Secure Video Upload (Finalized with Metadata Framework)
 app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) => {
   const file = req.file;
@@ -256,11 +258,17 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
   }
 
   try {
-    // 🛡️ SECURITY: Verify user is verified and IDs match
+    // 🛡️ SECURITY: Verify user is verified, not banned, and IDs match
     const userDoc = await db.collection("users").doc(req.user.uid).get();
     if (!userDoc.exists || !userDoc.data().isVerified) {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       return res.status(403).json({ error: "Please verify your email before uploading videos." });
+    }
+
+    // 🛡️ BAN CHECK: Prevent banned users from uploading
+    if (userDoc.data().isBanned === true) {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      return res.status(403).json({ error: "Your account has been restricted from uploading videos. Contact an administrator." });
     }
 
     if (req.user.uid !== userId) {
@@ -291,7 +299,7 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
     // 2. Upload to YouTube (Background Task)
     await docRef.update({ stage: "uploading_to_youtube", statusMessage: "Uploading video to YouTube..." });
 
-    const youtubeRes = await youtube.videos.insert({
+    const youtubeRes = await retryWithBackoff(() => youtube.videos.insert({
       part: "snippet,status",
       requestBody: {
         snippet: {
@@ -301,7 +309,7 @@ app.post("/api/upload", verifyToken, upload.single("video"), async (req, res) =>
         status: { privacyStatus: "unlisted" },
       },
       media: { body: fs.createReadStream(file.path) },
-    });
+    }), 3, 2000);
 
     const ytVideoId = youtubeRes.data.id;
 
@@ -355,53 +363,99 @@ app.get("/api/admin/flagged-videos", verifyToken, verifyAdmin, async (req, res) 
 // ==========================================
 const cron = require("node-cron");
 
-// Run every hour to continuously verify if live videos were deleted off YouTube manually
+// Helper: Persist sync log to Firestore for admin review
+async function logSyncEvent(type, message, details = {}) {
+  try {
+    await db.collection("sync_logs").add({
+      type,       // 'info', 'warning', 'error'
+      message,
+      details,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.error("[CRON] Failed to persist log:", e.message);
+  }
+}
+
+// Run every hour to verify YouTube links and sync metadata
 cron.schedule("0 * * * *", async () => {
-  console.log("[CRON] Running YouTube Broken Link Synchronization...");
+  console.log("[CRON] Running YouTube Synchronization...");
   try {
     const vidsRef = db.collection("videos");
     const snapshot = await vidsRef.where("status", "==", "ready").get();
 
-    if (snapshot.empty) return console.log("[CRON] No active videos to sync.");
+    if (snapshot.empty) {
+      console.log("[CRON] No active videos to sync.");
+      await logSyncEvent("info", "No active videos to sync.");
+      return;
+    }
 
-    // Map out Document references mapped by videoId
+    // Map Document refs and stored data by YouTube videoId
     const ytIdMap = new Map();
     snapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.videoId) ytIdMap.set(data.videoId, doc.ref);
+      if (data.videoId) ytIdMap.set(data.videoId, { ref: doc.ref, data });
     });
 
     const videoIds = Array.from(ytIdMap.keys());
+    let brokenCount = 0;
+    let updatedCount = 0;
 
-    // Chunk array into batches of 50 (YouTube API Hard Limit)
+    // Chunk into batches of 50 (YouTube API limit)
     const chunkSize = 50;
     for (let i = 0; i < videoIds.length; i += chunkSize) {
       const chunk = videoIds.slice(i, i + chunkSize);
 
-      const res = await youtube.videos.list({
-        part: "status",
+      // Fetch snippet + status so we can sync titles/descriptions too
+      const res = await retryWithBackoff(() => youtube.videos.list({
+        part: "snippet,status",
         id: chunk.join(","),
-      });
+      }));
 
-      // YouTube API gently omits data for deleted/ghost videos!
-      const activeIds = res.data.items.map((item) => item.id);
+      const activeMap = new Map();
+      res.data.items.forEach((item) => activeMap.set(item.id, item));
 
       for (const reqId of chunk) {
-        if (!activeIds.includes(reqId)) {
-          console.log(`[CRON] De-Platformed ghost link detected: ${reqId}`);
+        const entry = ytIdMap.get(reqId);
 
-          await ytIdMap.get(reqId).update({
+        if (!activeMap.has(reqId)) {
+          // Video deleted from YouTube
+          console.log(`[CRON] Broken link detected: ${reqId}`);
+          await entry.ref.update({
             brokenLink: true,
             isFlagged: true,
             status: "error",
             statusMessage: "Video removed from YouTube",
           });
+          brokenCount++;
+          await logSyncEvent("warning", `Broken link detected: ${entry.data.title}`, { videoId: reqId, courseCode: entry.data.courseCode });
+        } else {
+          // Sync title and description if YouTube version differs
+          const ytSnippet = activeMap.get(reqId).snippet;
+          const updates = {};
+          if (ytSnippet.title && ytSnippet.title !== entry.data.title) {
+            updates.title = ytSnippet.title;
+          }
+          if (ytSnippet.description !== undefined && ytSnippet.description !== entry.data.description) {
+            updates.description = ytSnippet.description;
+          }
+          if (Object.keys(updates).length > 0) {
+            await entry.ref.update(updates);
+            updatedCount++;
+            console.log(`[CRON] Synced metadata for: ${reqId}`);
+            await logSyncEvent("info", `Metadata synced for: ${entry.data.title}`, { videoId: reqId, updates });
+          }
         }
       }
     }
-    console.log("[CRON] Sync Complete.");
+
+    const summary = `Sync complete. Checked: ${videoIds.length}, Broken: ${brokenCount}, Updated: ${updatedCount}`;
+    console.log(`[CRON] ${summary}`);
+    await logSyncEvent("info", summary);
+
   } catch (error) {
     console.error("[CRON] Sync Failed:", error.message);
+    await logSyncEvent("error", `Sync failed: ${error.message}`);
   }
 });
 

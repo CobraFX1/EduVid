@@ -92,6 +92,47 @@
         </div>
       </div>
     </div>
+
+    <!-- My Uploads Section -->
+    <div class="full-width-section">
+      <h3 class="section-heading">My Uploads <span class="count-chip">{{ myVideos.length }}</span></h3>
+      <div v-if="myVideos.length === 0" class="empty-inline">
+        <i class="bi bi-camera-video-off"></i>
+        <span>No videos uploaded yet.</span>
+        <router-link to="/upload" class="btn-gradient" style="padding:0.4rem 1rem; font-size:0.8rem;">Upload</router-link>
+      </div>
+      <div v-else class="uploads-grid">
+        <router-link v-for="v in myVideos" :key="v.id" :to="`/watch/${v.id}`" class="upload-card glass-card">
+          <img v-if="v.thumbnailUrl" :src="v.thumbnailUrl" class="upload-thumb" alt="" />
+          <div v-else class="upload-thumb-ph"><i class="bi bi-film"></i></div>
+          <div class="upload-info">
+            <p class="upload-title">{{ v.title }}</p>
+            <div class="upload-meta">
+              <span v-if="v.courseCode" class="course-tag">{{ v.courseCode }}</span>
+              <span>{{ v.views || 0 }} views</span>
+            </div>
+          </div>
+        </router-link>
+      </div>
+    </div>
+
+    <!-- Recent Activity Section -->
+    <div class="full-width-section">
+      <h3 class="section-heading">Recent Activity</h3>
+      <div v-if="recentActivity.length === 0" class="empty-inline">
+        <i class="bi bi-clock-history"></i>
+        <span>No recent activity.</span>
+      </div>
+      <div v-else class="activity-list">
+        <div v-for="a in recentActivity" :key="a.id" class="activity-item glass-card">
+          <i :class="a.icon" class="activity-icon"></i>
+          <div class="activity-body">
+            <p class="activity-text">{{ a.text }}</p>
+            <span class="activity-date">{{ a.date }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -99,7 +140,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { db } from '../firebase'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -107,6 +148,8 @@ const router = useRouter()
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
+const myVideos = ref([])
+const recentActivity = ref([])
 
 const form = ref({
   name: '',
@@ -188,15 +231,7 @@ const departments = [
   'Economics', 'Mass Communication', 'Law', 'Medicine', 'Nursing'
 ]
 
-onMounted(() => {
-  const p = authStore.userProfile
-  if (p) {
-    form.value.name = p.name || ''
-    form.value.matricNumber = p.matricNumber || ''
-    form.value.department = p.department || ''
-    form.value.level = p.level || ''
-  }
-})
+// (onMounted is defined below with fetchMyVideos and fetchActivity)
 
 const saveProfile = async () => {
   saving.value = true; error.value = ''; saved.value = false
@@ -221,6 +256,84 @@ const handleLogout = async () => {
   await authStore.logout()
   router.push('/login')
 }
+
+const formatDate = (ts) => {
+  if (!ts) return ''
+  const d = ts.toDate ? ts.toDate() : new Date(ts)
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d)
+}
+
+// Fetch user's uploaded videos
+const fetchMyVideos = async () => {
+  if (!authStore.user) return
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'videos'), where('userId', '==', authStore.user.uid))
+    )
+    let data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    data.sort((a, b) => {
+      const t1 = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+      const t2 = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+      return t2 - t1
+    })
+    myVideos.value = data.slice(0, 6) // Show latest 6
+  } catch (e) { console.error('Failed to load videos:', e) }
+}
+
+// Fetch recent activity (comments + ratings by this user)
+const fetchActivity = async () => {
+  if (!authStore.user) return
+  const activity = []
+  try {
+    // Get user's videos to scan their subcollections
+    const vSnap = await getDocs(collection(db, 'videos'))
+    for (const vDoc of vSnap.docs) {
+      // Check for user's comments on this video
+      const cSnap = await getDocs(
+        query(collection(db, 'videos', vDoc.id, 'comments'), where('userId', '==', authStore.user.uid))
+      )
+      cSnap.docs.forEach(cDoc => {
+        const d = cDoc.data()
+        activity.push({
+          id: cDoc.id,
+          icon: 'bi bi-chat-left-text',
+          text: `Commented on "${vDoc.data().title}": "${(d.text || '').slice(0, 60)}${d.text?.length > 60 ? '...' : ''}"`,
+          date: formatDate(d.createdAt),
+          ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
+        })
+      })
+      // Check for user's ratings
+      const rSnap = await getDocs(
+        query(collection(db, 'videos', vDoc.id, 'ratings'), where('userId', '==', authStore.user.uid))
+      )
+      rSnap.docs.forEach(rDoc => {
+        const d = rDoc.data()
+        const stars = d.clarity || d.rating || 0
+        activity.push({
+          id: rDoc.id,
+          icon: 'bi bi-star-fill',
+          text: `Rated "${vDoc.data().title}" ${stars}/5 for clarity`,
+          date: formatDate(d.createdAt),
+          ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
+        })
+      })
+    }
+    activity.sort((a, b) => b.ts - a.ts)
+    recentActivity.value = activity.slice(0, 10)
+  } catch (e) { console.error('Failed to load activity:', e) }
+}
+
+onMounted(() => {
+  const p = authStore.userProfile
+  if (p) {
+    form.value.name = p.name || ''
+    form.value.matricNumber = p.matricNumber || ''
+    form.value.department = p.department || ''
+    form.value.level = p.level || ''
+  }
+  fetchMyVideos()
+  fetchActivity()
+})
 </script>
 
 <style scoped>
@@ -297,4 +410,44 @@ select.form-dark option { background: #1a1b2e; }
 .logout-btn:hover { background: rgba(239,68,68,0.1); }
 .spin { display: inline-block; animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Uploads & Activity Sections */
+.full-width-section { grid-column: 1 / -1; margin-top: 1.5rem; }
+.section-heading {
+  font-size: 1.1rem; font-weight: 700; margin: 0 0 1rem;
+  display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);
+}
+.count-chip {
+  background: rgba(108,99,255,0.12); color: var(--accent);
+  border-radius: 999px; padding: 2px 10px; font-size: 0.75rem; font-weight: 700;
+}
+.empty-inline {
+  display: flex; align-items: center; gap: 0.75rem; padding: 1.5rem;
+  color: var(--text-secondary); font-size: 0.9rem;
+  border: 1px dashed var(--border); border-radius: 12px;
+}
+.empty-inline i { font-size: 1.3rem; opacity: 0.5; }
+.uploads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.upload-card {
+  text-decoration: none; display: flex; flex-direction: column; overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.upload-card:hover { transform: translateY(-3px); }
+.upload-thumb { width: 100%; height: 110px; object-fit: cover; border-radius: 12px 12px 0 0; }
+.upload-thumb-ph {
+  width: 100%; height: 110px; background: rgba(108,99,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); font-size: 1.5rem; border-radius: 12px 12px 0 0;
+}
+.upload-info { padding: 0.75rem; }
+.upload-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.72rem; color: var(--text-secondary); }
+.course-tag { background: rgba(108,99,255,0.12); color: var(--accent); border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 0.68rem; }
+
+.activity-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.activity-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.9rem 1rem; }
+.activity-icon { font-size: 1rem; color: var(--accent); margin-top: 2px; flex-shrink: 0; }
+.activity-body { flex: 1; min-width: 0; }
+.activity-text { font-size: 0.85rem; color: var(--text-primary); margin: 0 0 0.2rem; line-height: 1.4; }
+.activity-date { font-size: 0.72rem; color: var(--text-secondary); }
 </style>

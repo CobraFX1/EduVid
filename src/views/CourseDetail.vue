@@ -40,10 +40,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { db } from '../firebase'
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore'
 import VideoCard from '../components/VideoCard.vue'
 
 const route = useRoute()
@@ -51,25 +51,40 @@ const course = ref(null)
 const videos = ref([])
 const loading = ref(true)
 
-const fetchVideos = async () => {
-  const snap = await getDocs(
-    query(collection(db, 'videos'), where('courseCode', '==', route.params.code), where('status', '==', 'ready'))
+let unsubVideos = null
+
+const startVideoListener = () => {
+  const q = query(
+    collection(db, 'videos'),
+    where('courseCode', '==', route.params.code),
+    where('status', '==', 'ready')
   )
-  const results = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  results.sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-  videos.value = results
+  unsubVideos = onSnapshot(q, (snap) => {
+    const results = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    results.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+    videos.value = results
+  }, (err) => {
+    console.error('CourseDetail video listener error:', err)
+  })
 }
 
 onMounted(async () => {
   try {
-    // Load course info
+    // Load course info (one-time)
     const courseSnap = await getDocs(
       query(collection(db, 'courses'), where('code', '==', route.params.code))
     )
     if (!courseSnap.empty) course.value = { id: courseSnap.docs[0].id, ...courseSnap.docs[0].data() }
-    await fetchVideos()
-  } catch (e) { console.error(e) }
+    startVideoListener()
+  } catch (e) {
+    console.error(e)
+    alert('Failed to load course data. Please check your connection and try again.')
+  }
   finally { loading.value = false }
+})
+
+onUnmounted(() => {
+  if (unsubVideos) unsubVideos()
 })
 </script>
 

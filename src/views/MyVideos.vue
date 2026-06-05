@@ -41,8 +41,70 @@
           <router-link v-if="video.videoId" :to="`/watch/${video.id}`" class="action-btn watch-btn" title="Watch">
             <i class="bi bi-play-circle"></i>
           </router-link>
+          <button @click="openEdit(video)" class="action-btn edit-btn" title="Edit">
+            <i class="bi bi-pencil-square"></i>
+          </button>
           <button @click="deleteVideo(video)" class="action-btn del-btn" title="Delete">
             <i class="bi bi-trash3"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
+      <div class="modal-box glass-card">
+        <h4 class="modal-title">Edit Video Details</h4>
+        
+        <div class="field-group">
+          <label class="field-label">Title *</label>
+          <input v-model="editData.title" class="form-input" placeholder="Video title" />
+        </div>
+
+        <div class="edit-row">
+          <div class="field-group">
+            <label class="field-label">Department *</label>
+            <select v-model="editData.department" class="form-input">
+              <option value="" disabled>Select department</option>
+              <option v-for="d in editDepartments" :key="d" :value="d">{{ d }}</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Level *</label>
+            <select v-model="editData.level" class="form-input">
+              <option value="" disabled>Select level</option>
+              <option v-for="l in [100,200,300,400,500]" :key="l" :value="l">{{ l }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="edit-row">
+          <div class="field-group">
+            <label class="field-label">Course Code *</label>
+            <select v-model="editData.courseCode" class="form-input" :disabled="!editData.department">
+              <option value="" disabled>Select course</option>
+              <option v-for="c in editFilteredCourses" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Topic</label>
+            <input v-model="editData.topic" class="form-input" placeholder="e.g. Linked Lists" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Description</label>
+          <textarea v-model="editData.description" class="form-input" rows="3"></textarea>
+        </div>
+
+        <div v-if="editError" class="edit-error">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ editError }}
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-glass" @click="showEditModal = false">Cancel</button>
+          <button class="btn-gradient" @click="saveEdit" :disabled="savingEdit">
+            {{ savingEdit ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
       </div>
@@ -51,15 +113,103 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { db } from '../firebase'
-import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
-import { decrementCourseCount } from '../utils/course'
+import { decrementCourseCount, incrementCourseCount } from '../utils/course'
 
 const authStore = useAuthStore()
 const videos = ref([])
 const loading = ref(true)
+
+// Edit state
+const showEditModal = ref(false)
+const savingEdit = ref(false)
+const editError = ref('')
+const editVideoId = ref(null)
+const editOriginalCode = ref('')
+const editData = ref({ title: '', topic: '', courseCode: '', department: '', level: '', description: '' })
+const editDepartments = ref([])
+const editCoursesByDept = ref({})
+
+const editFilteredCourses = computed(() => {
+  if (!editData.value.department) return []
+  const codes = editCoursesByDept.value[editData.value.department] || []
+  return codes.map(c => c.replace(/\s+/g, '').toUpperCase())
+})
+
+watch(() => editData.value.department, (newVal, oldVal) => {
+  if (oldVal && newVal !== oldVal) editData.value.courseCode = ''
+})
+
+const openEdit = async (video) => {
+  editVideoId.value = video.id
+  editOriginalCode.value = video.courseCode || ''
+  editData.value = {
+    title: video.title || '',
+    topic: video.topic || '',
+    courseCode: video.courseCode || '',
+    department: video.department || '',
+    level: video.level || '',
+    description: video.description || ''
+  }
+  editError.value = ''
+  showEditModal.value = true
+  try {
+    const deptSnap = await getDocs(collection(db, 'departments'))
+    editDepartments.value = deptSnap.docs.map(d => d.data().name).filter(Boolean).sort()
+    const courseSnap = await getDocs(collection(db, 'courses'))
+    const grouped = {}
+    courseSnap.docs.forEach(d => {
+      const { department, code } = d.data()
+      if (department && code) {
+        if (!grouped[department]) grouped[department] = []
+        grouped[department].push(code)
+      }
+    })
+    editCoursesByDept.value = grouped
+  } catch (e) { console.error('Failed to load edit options:', e) }
+}
+
+const saveEdit = async () => {
+  editError.value = ''
+  if (!editData.value.title.trim()) { editError.value = 'Title is required.'; return }
+  if (!editData.value.department || !editData.value.courseCode || !editData.value.level) {
+    editError.value = 'Department, Course Code, and Level are required.'; return
+  }
+  savingEdit.value = true
+  try {
+    const cleanCode = editData.value.courseCode.replace(/\s+/g, '').toUpperCase()
+    await updateDoc(doc(db, 'videos', editVideoId.value), {
+      title: editData.value.title.trim(),
+      topic: editData.value.topic.trim(),
+      courseCode: cleanCode,
+      department: editData.value.department,
+      level: parseInt(editData.value.level),
+      description: editData.value.description.trim()
+    })
+    if (editOriginalCode.value && editOriginalCode.value !== cleanCode) {
+      decrementCourseCount(editOriginalCode.value)
+      incrementCourseCount(cleanCode)
+    }
+    const v = videos.value.find(v => v.id === editVideoId.value)
+    if (v) {
+      v.title = editData.value.title.trim()
+      v.topic = editData.value.topic.trim()
+      v.courseCode = cleanCode
+      v.department = editData.value.department
+      v.level = parseInt(editData.value.level)
+      v.description = editData.value.description.trim()
+    }
+    showEditModal.value = false
+  } catch (err) {
+    console.error('Update Error:', err)
+    editError.value = 'Failed to update. Please try again.'
+  } finally {
+    savingEdit.value = false
+  }
+}
 
 const fetchVideos = async () => {
   loading.value = true
@@ -136,4 +286,19 @@ onMounted(fetchVideos)
 .state-center { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5rem 1rem; }
 .spinner { width: 36px; height: 36px; border: 3px solid rgba(108,99,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.edit-btn { color: var(--accent); }
+.edit-btn:hover { background: rgba(108,99,255,0.12); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(6px); }
+.modal-box { max-width: 550px; width: 90%; padding: 2rem; border: 1px solid var(--border); }
+.modal-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary); }
+.field-group { margin-bottom: 1.25rem; }
+.field-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
+.form-input { width: 100%; padding: 0.75rem; background: rgba(108,99,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); outline: none; transition: all 0.2s; font-family: inherit; }
+.form-input:focus { border-color: var(--accent); background: rgba(108,99,255,0.1); }
+.edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.edit-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.85rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+.modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
+.btn-glass { border: 1px solid var(--border); color: var(--text-primary); padding: 0.6rem 1.25rem; border-radius: 10px; cursor: pointer; font-weight: 600; background: transparent; }
+.btn-gradient { padding: 0.6rem 1.25rem; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; color: white; background: linear-gradient(135deg, #6c63ff, #a855f7); }
+.btn-gradient:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

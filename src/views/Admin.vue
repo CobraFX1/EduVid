@@ -9,7 +9,10 @@
           <button @click="activeTab = 'courses'" :class="{ active: activeTab === 'courses' }" class="tab-btn">Curriculum Manager</button>
           <button @click="activeTab = 'users'" :class="{ active: activeTab === 'users' }" class="tab-btn">User Directory</button>
           <button @click="activeTab = 'moderation'" :class="{ active: activeTab === 'moderation' }" class="tab-btn">Moderation Queue</button>
+          <button @click="activeTab = 'comments'" :class="{ active: activeTab === 'comments' }" class="tab-btn">Comments</button>
           <button @click="activeTab = 'broken'" :class="{ active: activeTab === 'broken' }" class="tab-btn">Broken Links</button>
+          <button @click="activeTab = 'sync-logs'" :class="{ active: activeTab === 'sync-logs' }" class="tab-btn">Sync Logs</button>
+          <button @click="activeTab = 'analytics'" :class="{ active: activeTab === 'analytics' }" class="tab-btn">Analytics</button>
         </div>
       </div>
       <div v-if="activeTab === 'videos'" class="admin-filters">
@@ -126,6 +129,86 @@
       <BrokenLinks />
     </div>
 
+    <!-- Comment Moderation -->
+    <div v-if="activeTab === 'comments'">
+      <CommentModeration />
+    </div>
+
+    <!-- Sync Logs -->
+    <div v-if="activeTab === 'sync-logs'">
+      <div class="section-block">
+        <div class="header">
+          <h2>YouTube Sync Logs</h2>
+          <button @click="fetchSyncLogs" class="refresh-btn" :class="{ spinning: loadingSyncLogs }">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div v-if="loadingSyncLogs" class="state-center"><div class="spinner"></div></div>
+        <div v-else-if="syncLogs.length === 0" class="state-center">
+          <i class="bi bi-journal-text" style="font-size:2rem; opacity:0.4;"></i>
+          <p style="color:var(--text-secondary); margin-top:0.5rem;">No sync logs yet.</p>
+        </div>
+        <div v-else class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Message</th>
+                <th>Details</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in syncLogs" :key="log.id" class="table-row">
+                <td>
+                  <span class="status-pill" :class="logPillClass(log.type)">{{ log.type }}</span>
+                </td>
+                <td style="max-width:400px;">{{ log.message }}</td>
+                <td style="font-size:0.75rem; color:var(--text-secondary); max-width:200px; word-break:break-all;">
+                  {{ log.details && Object.keys(log.details).length ? JSON.stringify(log.details) : '—' }}
+                </td>
+                <td class="col-date">{{ formatDate(log.createdAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics -->
+    <div v-if="activeTab === 'analytics'">
+      <div class="section-block">
+        <div class="header"><h2>Platform Analytics</h2></div>
+        <div v-if="loadingAnalytics" class="state-center"><div class="spinner"></div></div>
+        <div v-else class="stats-row">
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: var(--accent);">{{ analytics.totalUsers }}</div>
+            <div class="stat-label">Registered Users</div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: #4ade80;">{{ analytics.totalVideos }}</div>
+            <div class="stat-label">Total Videos</div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: #fbbf24;">{{ analytics.totalViews }}</div>
+            <div class="stat-label">Total Views</div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: #a78bfa;">{{ analytics.totalComments }}</div>
+            <div class="stat-label">Total Comments</div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: #f9a8d4;">{{ analytics.totalRatings }}</div>
+            <div class="stat-label">Total Ratings</div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-value" style="color: #f87171;">{{ analytics.bannedUsers }}</div>
+            <div class="stat-label">Banned Users</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Stats cards (Videos specific) -->
     <div v-if="activeTab === 'videos'" class="stats-row">
       <div class="stat-card glass-card" v-for="stat in stats" :key="stat.label">
@@ -139,17 +222,26 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db } from '../firebase'
-import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy, deleteDoc, doc, limit } from 'firebase/firestore'
 import { decrementCourseCount } from '../utils/course'
 import CourseManager from '../components/CourseManager.vue'
 import UserManager from '../components/UserManager.vue'
 import ModerationQueue from '../components/ModerationQueue.vue'
 import BrokenLinks from '../components/BrokenLinks.vue'
+import CommentModeration from '../components/CommentModeration.vue'
 
 const activeTab = ref('videos')
 const videos = ref([])
 const loading = ref(true)
 const activeFilter = ref('all')
+
+// Sync Logs state
+const syncLogs = ref([])
+const loadingSyncLogs = ref(false)
+
+// Analytics state
+const analytics = ref({ totalUsers: 0, totalVideos: 0, totalViews: 0, totalComments: 0, totalRatings: 0, bannedUsers: 0 })
+const loadingAnalytics = ref(false)
 
 const filters = [
   { key: 'all', label: 'All' },
@@ -238,6 +330,61 @@ const formatDate = (ts) => {
 }
 
 onMounted(fetchVideos)
+
+// Sync Logs
+const fetchSyncLogs = async () => {
+  loadingSyncLogs.value = true
+  try {
+    const q = query(collection(db, 'sync_logs'), orderBy('createdAt', 'desc'), limit(100))
+    const snap = await getDocs(q)
+    syncLogs.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  } catch (e) { console.error('Failed to load sync logs:', e) }
+  finally { loadingSyncLogs.value = false }
+}
+
+const logPillClass = (type) => ({
+  info: 'pill-ready',
+  warning: 'pill-processing',
+  error: 'pill-error',
+}[type] || 'pill-processing')
+
+// Analytics
+const fetchAnalytics = async () => {
+  loadingAnalytics.value = true
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'))
+    const videosSnap = await getDocs(collection(db, 'videos'))
+    
+    let totalViews = 0
+    let totalComments = 0
+    let totalRatings = 0
+    
+    for (const vDoc of videosSnap.docs) {
+      totalViews += vDoc.data().views || 0
+      const commSnap = await getDocs(collection(db, 'videos', vDoc.id, 'comments'))
+      totalComments += commSnap.size
+      const ratSnap = await getDocs(collection(db, 'videos', vDoc.id, 'ratings'))
+      totalRatings += ratSnap.size
+    }
+    
+    analytics.value = {
+      totalUsers: usersSnap.size,
+      totalVideos: videosSnap.size,
+      totalViews,
+      totalComments,
+      totalRatings,
+      bannedUsers: usersSnap.docs.filter(d => d.data().isBanned === true).length
+    }
+  } catch (e) { console.error('Analytics error:', e) }
+  finally { loadingAnalytics.value = false }
+}
+
+// Auto-fetch when switching to specific tabs
+import { watch } from 'vue'
+watch(activeTab, (tab) => {
+  if (tab === 'sync-logs' && syncLogs.value.length === 0) fetchSyncLogs()
+  if (tab === 'analytics') fetchAnalytics()
+})
 </script>
 
 <style scoped>

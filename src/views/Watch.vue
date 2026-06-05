@@ -1,6 +1,11 @@
 <template>
   <div class="watch-page">
     <div v-if="loading" class="state-center"><div class="spinner"></div></div>
+    <div v-else-if="errorMsg" class="state-center">
+      <i class="bi bi-exclamation-triangle" style="font-size:2.5rem; color:#f87171; margin-bottom:0.75rem;"></i>
+      <p style="color:var(--text-secondary);">{{ errorMsg }}</p>
+      <router-link to="/" class="btn-glass" style="margin-top:1rem;">Back to Home</router-link>
+    </div>
     <template v-else-if="video">
       <div class="watch-layout">
         <div class="player-col">
@@ -31,7 +36,7 @@
                   @click="showEditModal = true" 
                   class="edit-meta-btn"
                 >
-                  <i class="bi bi-pencil-square"></i> Edit Tags
+                  <i class="bi bi-pencil-square"></i> Edit
                 </button>
 
                 <span class="status-pill" :class="video.status === 'ready' ? 'pill-ready' : 'pill-processing'">
@@ -55,15 +60,30 @@
                 <span class="action-label">Clarity</span>
                 <div class="stars">
                   <button
-                    v-for="s in 5" :key="s"
-                    @click="submitRating(s)"
+                    v-for="s in 5" :key="'c'+s"
+                    @click="submitRating('clarity', s)"
                     class="star-btn"
-                    :class="{ active: s <= (myRating || video.avgRating) }"
+                    :class="{ active: s <= (myClarityRating || video.avgClarity || video.avgRating) }"
                   >
-                    <i :class="s <= (myRating || video.avgRating) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                    <i :class="s <= (myClarityRating || video.avgClarity || video.avgRating) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
                   </button>
                 </div>
-                <span class="rating-avg">{{ video.avgRating?.toFixed(1) || '—' }} / 5</span>
+                <span class="rating-avg">{{ (video.avgClarity || video.avgRating)?.toFixed(1) || '—' }}</span>
+              </div>
+
+              <div class="rating-group">
+                <span class="action-label">Accuracy</span>
+                <div class="stars">
+                  <button
+                    v-for="s in 5" :key="'a'+s"
+                    @click="submitRating('accuracy', s)"
+                    class="star-btn"
+                    :class="{ active: s <= (myAccuracyRating || video.avgAccuracy) }"
+                  >
+                    <i :class="s <= (myAccuracyRating || video.avgAccuracy) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                  </button>
+                </div>
+                <span class="rating-avg">{{ video.avgAccuracy?.toFixed(1) || '—' }}</span>
               </div>
 
               <button @click="showFlagModal = true" class="flag-btn" :class="{ flagged: video.isFlagged }">
@@ -99,6 +119,14 @@
                   <div class="comment-header">
                     <span class="comment-author">{{ c.userName || (c.userEmail?.split('@')[0]) }}</span>
                     <span class="comment-date">{{ formatDate(c.createdAt) }}</span>
+                    <button
+                      v-if="authStore.user?.uid === c.userId"
+                      @click="deleteComment(c.id)"
+                      class="comment-delete-btn"
+                      title="Delete comment"
+                    >
+                      <i class="bi bi-trash3"></i>
+                    </button>
                   </div>
                   <p class="comment-text">{{ c.text }}</p>
                 </div>
@@ -123,21 +151,51 @@
 
     <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
       <div class="modal-box glass-card edit-modal">
-        <h4 class="modal-title">Edit Video Metadata</h4>
+        <h4 class="modal-title">Edit Video Details</h4>
         
         <div class="field-group">
-          <label class="field-label">Topic</label>
-          <input v-model="editData.topic" class="form-input" placeholder="e.g. Linked Lists" />
+          <label class="field-label">Title *</label>
+          <input v-model="editData.title" class="form-input" placeholder="Video title" />
         </div>
 
-        <div class="field-group">
-          <label class="field-label">Course Code</label>
-          <input v-model="editData.courseCode" class="form-input" placeholder="e.g. SEN401" />
+        <div class="edit-row">
+          <div class="field-group">
+            <label class="field-label">Department *</label>
+            <select v-model="editData.department" class="form-input">
+              <option value="" disabled>Select department</option>
+              <option v-for="d in editDepartments" :key="d" :value="d">{{ d }}</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Level *</label>
+            <select v-model="editData.level" class="form-input">
+              <option value="" disabled>Select level</option>
+              <option v-for="l in [100,200,300,400,500]" :key="l" :value="l">{{ l }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="edit-row">
+          <div class="field-group">
+            <label class="field-label">Course Code *</label>
+            <select v-model="editData.courseCode" class="form-input" :disabled="!editData.department">
+              <option value="" disabled>Select course</option>
+              <option v-for="c in editFilteredCourses" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Topic</label>
+            <input v-model="editData.topic" class="form-input" placeholder="e.g. Linked Lists" />
+          </div>
         </div>
 
         <div class="field-group">
           <label class="field-label">Description</label>
           <textarea v-model="editData.description" class="form-input" rows="3"></textarea>
+        </div>
+
+        <div v-if="editError" class="edit-error">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ editError }}
         </div>
 
         <div class="modal-actions">
@@ -170,14 +228,15 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { db } from '../firebase'
 import {
-  doc, getDoc, collection, getDocs, addDoc, updateDoc,
+  doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, where, serverTimestamp, increment, limit, onSnapshot, arrayUnion
 } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
+import { incrementCourseCount, decrementCourseCount } from '../utils/course'
 
 const route = useRoute()
 const router = useRouter()
@@ -194,19 +253,27 @@ const relatedVideos = ref([])
 // Interaction State
 const newComment = ref('')
 const submittingComment = ref(false)
-const myRating = ref(0)
+const myClarityRating = ref(0)
+const myAccuracyRating = ref(0)
 const showFlagModal = ref(false)
 const flagReason = ref('')
 const submittingFlag = ref(false)
+const errorMsg = ref('')
 
 // ✍️ Step 10 State
 const showEditModal = ref(false)
 const updatingMeta = ref(false)
 const editData = ref({
+  title: '',
   topic: '',
   courseCode: '',
+  department: '',
+  level: '',
   description: ''
 })
+const editError = ref('')
+const editDepartments = ref([])
+const editCoursesByDept = ref({})
 
 const flagReasons = ['Inaccurate academic content', 'Inappropriate or offensive', 'Copyright infringement', 'Spam or misleading', 'Other']
 
@@ -214,12 +281,46 @@ const flagReasons = ['Inaccurate academic content', 'Inappropriate or offensive'
 watch(video, (newVal) => {
   if (newVal) {
     editData.value = {
+      title: newVal.title || '',
       topic: newVal.topic || '',
       courseCode: newVal.courseCode || '',
+      department: newVal.department || '',
+      level: newVal.level || '',
       description: newVal.description || ''
     }
   }
 }, { immediate: true })
+
+const editFilteredCourses = computed(() => {
+  if (!editData.value.department) return []
+  const codes = editCoursesByDept.value[editData.value.department] || []
+  return codes.map(c => c.replace(/\s+/g, '').toUpperCase())
+})
+
+watch(() => editData.value.department, (newVal, oldVal) => {
+  if (oldVal && newVal !== oldVal) editData.value.courseCode = ''
+})
+
+const loadEditOptions = async () => {
+  try {
+    const deptSnap = await getDocs(collection(db, 'departments'))
+    editDepartments.value = deptSnap.docs.map(d => d.data().name).filter(Boolean).sort()
+    const courseSnap = await getDocs(collection(db, 'courses'))
+    const grouped = {}
+    courseSnap.docs.forEach(d => {
+      const { department, code } = d.data()
+      if (department && code) {
+        if (!grouped[department]) grouped[department] = []
+        grouped[department].push(code)
+      }
+    })
+    editCoursesByDept.value = grouped
+  } catch (e) { console.error('Failed to load edit options:', e) }
+}
+
+watch(showEditModal, (val) => {
+  if (val) { editError.value = ''; loadEditOptions() }
+})
 
 // Handle ID changes via sidebar
 watch(() => route.params.id, (newId) => {
@@ -275,26 +376,38 @@ const loadRecommendations = async (currentVideo) => {
 // ✍️ Step 10: Update Metadata Logic
 const updateMetadata = async () => {
   if (!authStore.user || updatingMeta.value) return
+  editError.value = ''
+  if (!editData.value.title.trim()) { editError.value = 'Title is required.'; return }
+  if (!editData.value.department || !editData.value.courseCode || !editData.value.level) {
+    editError.value = 'Department, Course Code, and Level are required.'; return
+  }
   updatingMeta.value = true
   try {
     const videoRef = doc(db, 'videos', videoId)
     const cleanCode = editData.value.courseCode.replace(/\s+/g, '').toUpperCase()
-    
+    const oldCode = video.value.courseCode
     await updateDoc(videoRef, {
+      title: editData.value.title.trim(),
       topic: editData.value.topic.trim(),
       courseCode: cleanCode,
+      department: editData.value.department,
+      level: parseInt(editData.value.level),
       description: editData.value.description.trim()
     })
-
-    // Update UI
-    video.value.topic = editData.value.topic
+    if (oldCode && oldCode !== cleanCode) {
+      decrementCourseCount(oldCode)
+      incrementCourseCount(cleanCode)
+    }
+    video.value.title = editData.value.title.trim()
+    video.value.topic = editData.value.topic.trim()
     video.value.courseCode = cleanCode
-    video.value.description = editData.value.description
-    
+    video.value.department = editData.value.department
+    video.value.level = parseInt(editData.value.level)
+    video.value.description = editData.value.description.trim()
     showEditModal.value = false
   } catch (err) {
-    console.error("Update Error:", err)
-    alert("Failed to update metadata.")
+    console.error('Update Error:', err)
+    editError.value = 'Failed to update metadata. Please try again.'
   } finally {
     updatingMeta.value = false
   }
@@ -313,19 +426,49 @@ const submitComment = async () => {
   newComment.value = ''; submittingComment.value = false;
 }
 
-const submitRating = async (stars) => {
+const submitRating = async (type, stars) => {
   if (!authStore.user) return
-  myRating.value = stars
+  if (type === 'clarity') myClarityRating.value = stars
+  else myAccuracyRating.value = stars
+
   const ratingsRef = collection(db, 'videos', videoId, 'ratings')
   const existing = await getDocs(query(ratingsRef, where('userId', '==', authStore.user.uid)))
   
-  if (!existing.empty) await updateDoc(existing.docs[0].ref, { rating: stars })
-  else await addDoc(ratingsRef, { userId: authStore.user.uid, rating: stars, createdAt: serverTimestamp() })
+  const ratingData = { [type]: stars }
+  if (!existing.empty) {
+    await updateDoc(existing.docs[0].ref, ratingData)
+  } else {
+    await addDoc(ratingsRef, { userId: authStore.user.uid, ...ratingData, createdAt: serverTimestamp() })
+  }
 
+  // Recalculate averages
   const allRatings = await getDocs(ratingsRef)
-  const avg = allRatings.docs.reduce((s, d) => s + d.data().rating, 0) / allRatings.size
-  await updateDoc(doc(db, 'videos', videoId), { avgRating: avg })
-  video.value.avgRating = avg
+  let claritySum = 0, clarityCount = 0, accuracySum = 0, accuracyCount = 0
+  allRatings.docs.forEach(d => {
+    const data = d.data()
+    if (data.clarity) { claritySum += data.clarity; clarityCount++ }
+    if (data.accuracy) { accuracySum += data.accuracy; accuracyCount++ }
+    // Legacy support: if old 'rating' field exists, treat as clarity
+    if (data.rating && !data.clarity) { claritySum += data.rating; clarityCount++ }
+  })
+  const avgClarity = clarityCount > 0 ? claritySum / clarityCount : 0
+  const avgAccuracy = accuracyCount > 0 ? accuracySum / accuracyCount : 0
+  const avgRating = clarityCount > 0 ? avgClarity : 0
+
+  await updateDoc(doc(db, 'videos', videoId), { avgRating, avgClarity, avgAccuracy })
+  video.value.avgRating = avgRating
+  video.value.avgClarity = avgClarity
+  video.value.avgAccuracy = avgAccuracy
+}
+
+const deleteComment = async (commentId) => {
+  if (!authStore.user || !confirm('Delete this comment?')) return
+  try {
+    await deleteDoc(doc(db, 'videos', videoId, 'comments', commentId))
+  } catch (e) {
+    console.error('Failed to delete comment:', e)
+    alert('Failed to delete comment.')
+  }
 }
 
 const submitFlag = async () => {
@@ -353,7 +496,10 @@ onMounted(async () => {
       loadRecommendations(video.value)
     }
     await loadComments()
-  } catch (e) { console.error(e) }
+  } catch (e) {
+    console.error(e)
+    errorMsg.value = 'Failed to load this video. It may have been removed or the network is unavailable.'
+  }
   finally { loading.value = false }
 })
 
@@ -460,6 +606,13 @@ const formatDate = (ts) => {
 .comment-author { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
 .comment-date { font-size: 0.75rem; color: var(--text-secondary); }
 .comment-text { font-size: 0.9rem; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+.comment-delete-btn {
+  background: none; border: none; color: var(--text-secondary); cursor: pointer;
+  font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; margin-left: auto;
+  opacity: 0; transition: opacity 0.15s, color 0.15s;
+}
+.comment-item:hover .comment-delete-btn { opacity: 1; }
+.comment-delete-btn:hover { color: #f87171; background: rgba(239,68,68,0.1); }
 
 /* Sidebar */
 .sidebar-col { position: sticky; top: 80px; height: fit-content; }
@@ -510,4 +663,6 @@ const formatDate = (ts) => {
 .spinner { width: 40px; height: 40px; border: 3px solid rgba(108,99,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .spin { display: inline-block; animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.edit-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.85rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
 </style>
