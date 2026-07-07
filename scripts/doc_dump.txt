@@ -1,0 +1,449 @@
+﻿Reading: DESIGN AND IMPLEMENTATION OF A WEB û BASED EDUCATIONAL VIDEO PLATFORM FOR PEER-TO-PEER LEARNING.docx
+
+[000|Normal              ] DESIGN AND IMPLEMENTATION OF A WEB û BASED EDUCATIONAL VIDEO PLATFORM FOR PEER-TO-PEER LEARNING: 
+A CASE STUDY OF DOMINION UNIVERSITY
+[003|Normal              ] BY
+[009|Normal              ] JACOB, STEPHEN OLAMILEKAN
+[010|Normal              ] MATRICULATION NUMBER: DU0544
+[014|Normal              ] May, 2026
+[016|Normal              ] DESIGN AND IMPLEMENTATION OF A WEB û BASED EDUCATIONAL VIDEO PLATFORM FOR PEER-TO-PEER LEARNING: 
+A CASE STUDY OF DOMINION UNIVERSITY
+[020|Normal              ] BY
+[024|Normal              ] NAME: JACOB STEPHEN OLAMILEKAN
+[025|Normal              ] MATRICULATION NUMBER: DU0544
+[029|Normal              ] A PROJECT SUBMITTED TO THE DEPARTMENT OF COMPUTER SCIENCE, IN PARTIAL FULFILMENT OF THE REQUIREMENTS FOR THE AWARD OF THE B.Sc. DEGREE IN SOFTWARE ENGINEERING, DOMINION UNIVERSITY IBADAN, NIGERIA
+[031|Heading 1           ] ABSTRACT
+[032|ds-markdown-paragraph] This project is about EduVid, which is an educational video-sharing platform that was created to support and improve peer-to-peer learning at Dominion University. Instead of general video websites like YouTube and the rest, EduVid is developed for th
+[033|ds-markdown-paragraph] Word count: 181
+[034|ds-markdown-paragraph] Keywords: Educational Video Platform, Peer-to-Peer Learning, Dominion University, Curriculum Alignment, Vue.js 3, Node.js, Firebase, Digital Education.
+[035|Heading 1           ] ANTI-PLAGIARISM DECLARATION
+[036|Normal              ] I acknowledge and understand that plagiarism, which involves using the concepts, writings, works, or inventions of someone else as if they were mine, exact copying, and extensive use of another personÆs ideas without proper acknowledgement, including
+[037|Normal              ] I also declare that I have not allowed and will not allow anyone to copy this project report in the future to pass it off as their work.
+[040|Normal              ] Name: Jacob Stephen Olamilekan 				Matric No: DU0544
+[042|Normal              ] Signature: 				   					Date: May 2026
+[044|Heading 1           ] CERTIFICATION
+[045|Normal              ] This is to certify that this project work was carried out by Jacob Stephen Olamilekan, with matriculation number DU0544 of the Department of Computer Science, Faculty of Computing and Applied Sciences, Dominion University Ibadan, Oyo State, Nigeria.
+[049|Normal              ] Pesu Y. Aromavo					Odunola R. Ayediran
+[050|Normal              ] B.Sc (HNUAB), M.Sc (Ibadan) 		B.Tech (Ogbomoso), M.Sc (Ibadan)
+[051|Normal              ] Supervisor						 Head of Department
+[053|Heading 1           ] ACKNOWLEDGEMENT
+[054|Normal              ] Special thanks to my supervisor, Miss P. Y. Aromavo, for her valuable guidance and encouragement. I extend my sincere appreciation to all my lecturers for their support and mentorship.
+[055|Normal              ] To everyone who contributed in one way or another to the successful completion of this work, I say a heartfelt thank you.
+[057|Heading 1           ] DEDICATION
+[058|Normal              ] This project is dedicated first and foremost to the Almighty God, whose unending grace, mercy, and divine guidance have been my anchor throughout this academic journey. Without His favour, this accomplishment would not have been possible.
+[059|Normal              ] To my parents, whose support, prayers, sacrifices, and encouragement have been the foundation of my strength and motivation, I dedicate this work to you.
+[093|Heading 1           ] LIST OF FIGURES
+[094|Normal              ] List of Figures
+[095|Normal              ] Figure 1: Agile Development Workflow (Abishek, 2021)
+[096|Normal              ] Figure 2: Client-Server Architecture (Anon, 2024)
+[097|Normal              ] Figure 3: Entity relationship diagram for the educational video platform
+[098|Normal              ] Figure 4: Use case diagram for an educational video platform
+[099|Normal              ] Figure 4.2: Landing Page of EduVid
+[100|Normal              ] Figure 4.3: Login Page of EduVid
+[101|Normal              ] Figure 4.4: Student Dashboard of EduVid
+[102|Normal              ] Figure 4.5: Search Results Page
+[103|Normal              ] Figure 4.6: Video Playback Page
+[104|Normal              ] Figure 4.7: Content Upload Form
+[105|Normal              ] Figure 4.8: Comment and Rating Module
+[106|Normal              ] Figure 4.9: Administrator Dashboard
+[107|Normal              ] Figure 4.10: Content Moderation Panel
+
+================================================================================
+  CHAPTER 1
+================================================================================
+[122|Heading 1           ] INTRODUCTION
+[123|List Paragraph      ] Background of the Study
+[124|Normal              ] The courses that universities and other tertiary institutions offer are usually for the university to transfer as much information about the course as possible. Even though the lecturers have good intentions with passing the courses, things hold them
+[125|Normal              ] Due to all these reasons, the lecturers would not be able to explain the courses to a very deep level. This situation causes the students to have a very shallow understanding of the topic, and they also lack detailed learning. The end result of this 
+[126|Normal              ] Among these students, there would be students who, through various reasons such as prior knowledge or because they can understand things faster, would understand the course much faster than others. This means that the people who understand the course
+[128|List Paragraph      ] Statement of the Problem
+[129|Normal              ] University students donÆt easily understand course materials because of time limits, large classes, and very limited access to the lecturers. Platforms like Udemy and Coursera are good, but they are not tailored to Dominion University's curriculum, a
+[130|List Paragraph      ] Aim and Objective of Study
+[131|Normal              ] The aim of this project is to design and implement an educational video-sharing platform that helps students to understand courses by applying peer-to-peer learning at Dominion University.
+[132|Normal              ] The objectives outlined below are to be achieved at the end of this project
+[133|Normal (Web)        ] To design an intuitive and user-friendly interface for course interaction.
+[134|Normal (Web)        ] To design a secure user authentication system.
+[135|Normal (Web)        ] To implement a functional search and course management module.
+[136|Normal (Web)        ] To develop a feedback system that enhances learning and course quality.
+[137|List Paragraph      ] Significance of study
+[139|Normal              ] The proposed project is important as it is using digital methods to increase understanding of course materials and it does this through peer-learning platform.
+[140|Normal              ] By making the transfer of knowledge efficient and increasing learning between peers. The project provides continuous access to videos created by peers, making learning self-paced and repetitive. Lecturers would benefit from the reduced pressure to co
+[141|List Paragraph      ] Scope of the study
+[142|Normal              ] The scope of this work covers the development of an educational video platform that is built for Dominion University. It would allow students to upload, access, and manage course-related videos, increasing the level of peer-to-peer learning and self-
+[144|List Paragraph      ] Organization of works
+[145|Normal              ] This study is structured into five chapters. Chapter One introduces the research, covering the background, significance, statement of the problem, aim, and objectives. Chapter Two reviews all related literature on educational video platforms, peer-to
+[148|Normal              ] 1.7 Definition of Terms
+[149|List Paragraph      ] Video-Sharing Platform: A platform that would let users to upload, share and watch videos.
+[150|List Paragraph      ] Peer-to-Peer Learning: A learning and training strategy that is suitable for two or more people where students would learn from their friends and also with their friends.
+[151|List Paragraph      ] User Authentication: A security process used to verify the identity of a user who wants access to a particular system or service
+[152|List Paragraph      ] Database Management System (DBMS): Software used for creating, managing, and manipulating databases, acting as an interface between users and the database. ItÆs used for efficient retrieval and modification.
+[153|List Paragraph      ] Front-End: The part of a web application that is visible and directly interacts with the user.
+[154|List Paragraph      ] Back-End: The server-side component responsible for processing requests, connecting with the front-end interface and managing data.
+[155|List Paragraph      ] Usability: The ease with which users can navigate and interact with the system to achieve their objectives efficiently.
+[156|List Paragraph      ] Cloud Storage: An online service that stores digital data on remote servers managed by a third û party provider, allows users to access files from any device with an internet connection.
+[157|List Paragraph      ] Streaming: A technology that allows continuous transmission and playback of video or audio content without requiring full download.
+[158|List Paragraph      ] Web Application: A software program that runs on a remote server and is accessed through a web browser over the internet.
+[159|List Paragraph      ] Application Programming Interface (API): A set of defined rules or protocols that enables software applications to communicate with each other to exchange data, features and functionality.
+[160|List Paragraph      ] User Interface (UI): The point of interaction between a human and a machine, consisting of all the visual and interactive elements a user engages with.
+[161|List Paragraph      ] Server: A computer that provides resources, data, or services to other computers, known as clients, over a network.
+[162|List Paragraph      ] Web Framework: A software framework that provides reusable tools and components for building and maintaining web applications efficiently.
+[163|List Paragraph      ] Database Schema: The logical structure of a database that defines how data is organized, stored, and related to one another within the system.
+
+================================================================================
+  CHAPTER TWO
+================================================================================
+[183|Heading 1           ] LITERATURE REVIEW
+[184|Heading 2           ] 2.1 Overview
+[185|Normal              ] This chapter will check all the current literature based on Peer-to-Peer learning systems, educational video platforms, and technology-based collaborative learning. This review purpose it to find out the strengths, limitations, and gaps in all system
+[186|Heading 3           ] 2.1.1 Background of Educational Video Platforms
+[187|Normal              ] Over the past decade, people have used educational video platforms a lot. Video-sharing platforms like YouTube would let users upload and watch videos on their platform with freedom, but even though these platforms have allowed people to have access 
+[188|Normal              ] Key features of educational video platforms include:
+[189|Normal              ] Video Upload and Streaming: These platforms would let users record, upload, and stream content to a very large number of people, increasing the number of people who have access to information.
+[190|Normal              ] Search and Navigation: Platforms like this usually make it easier to search for and find topics easily.
+[191|Normal              ] Progress Tracking: These Platforms would usually have things like completion certificates, course history, and performance analytics that would assist students in to know where they currently are
+[192|Normal              ] Collaboration and Interaction: Some of these platforms have ways that would allow students to add comments, discussions, and they would also allow other students to drop critics. Regardless of these features, these platforms are not always tailored t
+[193|Normal              ] Regardless of these features, these platforms are not always tailored to the specific needs of individual universities. It is common for them to offer general content that may not align with particular course curriculums or institutional policies. Th
+[195|Heading 3           ] 2.1.2 Background of Peer-to-Peer Learning
+[196|Normal              ] Peer learning is defined as æpeople from similar social groupings, who are not professional teachers, helping each other to learn and learning themselves by so doing.Æ (Topping, 2005). This method of learning is particularly effective in higher educa
+[197|Normal              ] Benefits of peer-to-peer learning include:
+[198|List Paragraph      ] Improved Comprehension:  Students find it easier to understand concepts when explained by peers who recently mastered the topic.
+[199|List Paragraph      ] Flexible Learning Pace:  Explanations can be revisited multiple times due to students being available, making it tailored to individual learning speeds.
+[200|List Paragraph      ] Leadership Development: Knowledgeable students gain leadership skills and confidence by teaching others. Thereby enhancing studentÆs school experience.
+[201|List Paragraph      ] Enhanced Motivation: Co-operation with peers builds a sense of community, encouraging participation and persistence.
+[202|Normal              ] However, informal peer learning sessions may have these shortcomings:
+[203|List Paragraph      ] Inconsistency: student availability often makes these sessions inconsistent.
+[204|List Paragraph      ] Limited Coverage: If fast learners focus only on areas, they find interesting, some topics may not be adequately addressed.
+[205|List Paragraph      ] Lack of Structure: Learning is often disorganized and less effective.
+[206|Normal              ] The platform wants to formalize this approach by providing organized channels for peer-driven video learning, ensuring consistency, accessibility, and comprehensiveness.
+[207|Heading 2           ] 2.2 Conceptual Review
+[208|Normal (Web)        ] This section would introduce key concepts that are relevant to the education platform. Each concept would provide a basis for the systemÆs design, structure and expected functionality. By going through concepts such as educational video platforms, , 
+[209|Heading 3           ] 2.2.1 Educational Video Platforms
+[210|Normal (Web)        ] An educational video platform is an online system that allows schools and teachers upload, manage, store, and share video content with students (Connolly, 2025). These platforms have evolved from normal video platforms to advanced systems such as You
+[211|Normal (Web)        ] Platforms like this usually support flexible and self-paced learning, which allows students to revisit lessons, deal with topics they find confusing, and learn by themselves. However, most of these platforms are not designed to follow specific instit
+[212|Heading 3           ] 2.2.2 Peer-to-Peer Learning
+[213|Normal (Web)        ] Peer-to-Peer (P2P) learning is an educational approach where students learn from one another through discussions and explanations. According to Boud, Cohen, and Sampson (2001), peer learning is mutually beneficial and involves the sharing of knowledg
+[214|Normal (Web)        ] P2P learning is effective because students often explain concepts in relatable terms, drawing from experiences within the same academic environment. This approach encourages better comprehension, increases motivation, and reduces learning anxiety (Ve
+[215|Heading 3           ] 2.2.3 Collaborative Learning
+[216|Normal (Web)        ] Collaborative learning refers to modes of learning where individuals work together to achieve academic goals. Collaborative learning makes it easier for students to work together, share what they understand and build further understanding with social
+[217|Normal (Web)        ] Educational video platforms can make collaborative learning achievable by allowing students to upload videos, comment on them while sharing various ways to approach a problem and make difficult concepts easier to understand. This would result in a le
+[218|Heading 3           ] 2.2.4 Digital Learning in Universities
+[219|Normal (Web)        ] Digital learning is the use of technology, this includes online platforms, multimedia tools, and interactive resources, to support learning experiences (Kirkwood & Price, 2014). With the growth of Learning Management Systems (LMS), cloud technology, 
+[220|Normal (Web)        ] Digital learning environments are better for various reasons this include remote accessibility, multimedia integration, personalized learning, and increased student engagement (Allen & Seaman, 2017). However, a lot of institutions put their attention
+[221|Heading 3           ] 2.2.5 Course Content Management for E-Learning Platforms
+[222|Normal (Web)        ] A Content Management System (CMS) is a software application that allows users to manage and organize digital content. In terms of e-learning, a CMS is defined as an internet-based application that gives access to course content, manages student enrol
+[223|Normal (Web)        ] Effective content management would allow its users locate specific topics much faster, go through learning materials by tags, and use content relevant to their academic progress.
+[224|Heading 2           ] 2.3 Theoretical Framework
+[225|Normal (Web)        ] The theoretical framework provides the academic basis for the video platform, answering the fundamental questions: How do students really learn? How is knowledge best built? And how can peer-to-peer collaboration help students understand much better?
+[226|Heading 3           ] 2.3.1 Constructivist Learning Theory
+[227|Normal (Web)        ] Constructivist Learning Theory, introduced by Jean Piaget, states the fact that learners actively construct knowledge rather than absorb it passively. Learning happens when individuals use new information, and add it with their previous knowledge (Vy
+[228|Heading 3           ] 2.3.2 Social Learning Theory
+[229|Normal              ] Social Learning Theory, based on the works of Lev Vygotsky, states that learning is heavily influenced by social interaction (Vygotsky, 1978). VygotskyÆs core concept, the Zone of Proximal Development (ZPD) describes how studentsÆ increase in knowled
+[231|Heading 3           ] 2.3.3 Cognitive Load Theory
+[232|Normal (Web)        ] Cognitive Load Theory (CLT), developed by John Sweller (1988), focuses on how information is processed in the working memory. Learning is more effective when instructional materials reduce unnecessary mental load, allow for understandable complexity,
+[233|Heading 3           ] 2.3.4 Peer Learning Theory
+[234|Normal (Web)        ] Peer Learning Theory details how students would benefit academically if they teach, guide, or collaborate with one another. Learning from peers, can increase motivation, improve understanding, and build confidence (Topping, 2017). Peer tutors when te
+[237|Normal              ] Summary of Theoretical Implications
+[238|Normal (Web)        ] These four theories guide the design of the system. Constructivism promotes active knowledge creation, Social Learning Theory supports interaction and collaboration, Cognitive Load Theory ensures that learning materials are clear and manageable, and 
+[239|Heading 2           ] 2.4 Empirical Review of Existing Platforms
+[240|Normal (Web)        ] The empirical review goes through real-world educational and video-based learning platforms to understand their features, strengths, limitations, and relevance to the development of this platform. This review focuses on widely used global platforms s
+[241|Heading 3           ] 2.4.1 YouTube and YouTube Education
+[242|Normal (Web)        ] YouTube is the largest global video-sharing platform, it displays a wide range of educational content through channels such as YouTube Education, CrashCourse, and Khan AcademyÆs older videos. Its search engine and recommendation algorithms help stude
+[243|Normal (Web)        ] Strengths:
+[244|Normal (Web)        ] The platform displays a large number of free educational videos that are easily accessible across various devices and places. It uses a search and recommendation algorithm that is very effective to helping users find what they want, while supporting 
+[245|Normal (Web)        ] Weaknesses:
+[246|Normal (Web)        ] The content on this platform is not aligned with the university curriculum, and because anyone can upload videos, the overall quality and accuracy is not constant. Additionally, students are easily distracted by a large amount of unrelated entertainm
+[247|Heading 3           ] 2.4.2 Udemy
+[248|Normal (Web)        ] Udemy is a commercial learning platform where instructors create and sell courses with video lectures, quizzes, and downloadable resources. It offers structured learning paths and professionally built content (Upskillwise, 2025; Udemy, 2025).
+[249|Normal (Web)        ] Strengths:
+[250|Normal (Web)        ] The platform has well-organized courses which are built on a step-by-step structure that makes learning one after the other. Students usually use professionally produced, easy-to-follow videos, along with tools like assessments, progress tracking, an
+[251|Normal (Web)        ] Weaknesses:
+[252|Normal (Web)        ] Paid courses is a financial issue for many students, and the content in this platform is usually general rather than specific university syllabuses. The platform doesnÆt have the flexibility for students to upload con tent freely and it does not supp
+[253|Heading 3           ] 2.4.3 Coursera
+[254|Normal (Web)        ] Coursera joins hands together with universities and companies to deliver accredited online courses with video lectures, assignments, graded assessments, and discussion forums, targeting learners seeking specific credentials or degrees (Coursera, 2025
+[255|Normal (Web)        ] Strengths:
+[256|Normal (Web)        ] The platform is highly credible academically because of its institutional partnerships, as well as offering well-researched video content. It provides a course structure adding quizzes and peer reviews, alongside progress tracking and certification.
+[257|Normal (Web)        ] Weaknesses:
+[258|Normal (Web)        ] The content is made for general online learners and is not made specifically for university courses, some of the courses are too advanced or too broad for undergraduate learners. The subscription fees for certifications also create a financial barrie
+[259|Heading 3           ] 2.4.4 Khan Academy
+[260|Normal              ] Khan Academy is a non-profit educational platform offering free instructional videos mainly for secondary-level and early undergraduate content. The platform's mission is to provide a free, world-class education for anyone, anywhere, their primary so
+[261|Normal (Web)        ] Strengths:
+[262|Normal (Web)        ] The platform does not charge and a fee and is easy to access, this leads to user engagement and it also supports learning at the pace of the students. It covers basic topics in mathematics, science, and computing through short, clear, and animated vi
+[263|Normal (Web)        ] Weaknesses:
+[264|Normal (Web)        ] The content is mostly limited to general academic subjects and is not aligned with Nigerian university departmental courses. The platform does not allow topic customization for university syllabuses and does not support peer-generated content.
+[265|Heading 3           ] 2.4.5 Summary of Empirical Gaps
+[266|Normal (Web)        ] From the analysis of existing platforms, the following gaps are evident:
+[267|Normal (Web)        ] No existing platform directly uses Dominion University course codes and syllabuses, leaving students without a localized academic resource. The current systems lack structured Peer-to-Peer video explanations, this means that students do not have a so
+[268|Normal (Web)        ] While global platforms offer lots of information, they contain distracting content, currently, no system provides searchable, topic-specific, student-generated content that undergraduates can easily navigate.
+[269|Normal (Web)        ] These gaps confirms the need for a customized platform that uses structured course organization, peer learning principles, and efficient video-based content delivery made for Dominion University students.
+[270|Normal (Web)        ] 2.5 Technological Infrastructure and User Expectations
+[271|Normal (Web)        ] Technology is one of the main causes of modern learning environments. With the rise of digital platforms, cloud computing, and multimedia tools, students can join hands together, share resources, and gain knowledge beyond traditional classrooms. Howe
+[272|Normal (Web)        ] 2.5.1 Streaming, Compression, and Bandwidth Optimization
+[273|Normal (Web)        ] Bandwidth limitations, data costs, and inconsistent network coverage are major challenges for digital learning in Nigerian higher education (Okonkwo et al., 2022; DergiPark, 2023). Quality educational videos need large file sizes, making seamless str
+[274|Normal (Web)        ] To meet the primary student expectation of low data consumption and cross-device accessibility, e-learning systems must prioritize data-saving protocols. Modern platforms use video compression standards such as H.264 and H.265 (HEVC) to reduce file s
+[275|Normal (Web)        ] 2.5.2 Cloud Infrastructure, Security, and Scalability
+[276|Normal (Web)        ] Institutional learning systems suffer from performance drops during high-traffic periods, limited storage capacity for media assets, and outdated authentication protocols (Oyekanmi et al., 2019). These bottlenecks run contrary to both administrator e
+[277|Normal (Web)        ] Cloud storage and cloud hosting solutions solve these problems by providing scalable infrastructure that reduces the local server maintenance costs (Adivi, 2023). Moving video repositories to the cloud allows the system to easily handle user traffic 
+[278|Normal (Web)        ] 2.5.3 Metadata Management, Searchability, and Curriculum Alignment
+[279|Normal (Web)        ] Large repositories of unorganized video content would overwhelm users, increasing cognitive load. Students expect intuitive navigation to find materials rapidly rather than the disorganized, broad content structures found on public platforms like You
+[280|Normal (Web)        ] This alignment would be achieved by using content tagging and metadata management. Using metadata such as course codes, explicit topic titles, keywords, and timestamps, it would transform raw video files into discoverable, curriculum-aligned learning
+[281|Normal (Web)        ] Information retrieval and search algorithms would use this metadata to arrange academic videos instantly by department, level, or course code.
+[282|Normal (Web)        ] 2.5.4 Interaction Tools and Participatory Feedback
+[283|Normal (Web)        ] Collaborative learning relies on active social interaction rather than passive content consumption. This technological perspective addresses the student expectation for interactive peer-generated explanations.
+[284|Normal (Web)        ] Digital communication tools including comment sections, discussions, and peer review systems turn standalone video content into an active learning community. Comment sections allow students to ask questions, seek further explanation on complex deriva
+[285|Normal (Web)        ] For creators, these feedback tools build skills necessary to guide others and encourage content revision.
+[289|Normal (Web)        ] 2.5.5 Data-Driven Content Delivery
+[290|Normal (Web)        ] In a peer-driven environment, Too much information at once can make it hard for students to discover relevant secondary materials. Modern digital platforms use recommendation systems to surface specific content based on user interaction trends and ac
+[291|Normal (Web)        ] While machine-learning recommendation models are often computationally heavy, a simple feature that recommends videos using rules satisfies user expectations by driving personal discovery. By analyzing metrics like course registration, trending searc
+[292|Normal (Web)        ] This assists students in discovering necessary material they may not have actively searched for, expanding their understanding of subjects and making efficient use of the collective knowledge of the university's peer network.
+[293|Normal (Web)        ] Summary of Technological and User Alignment
+[294|Normal (Web)        ] The use of these technical frameworks directly satisfies the needs of the university ecosystem:
+[295|Normal (Web)        ] Students receive low-data, mobile-optimized, easily searchable video explanations that perfectly match their course syllabus and allow for interactive peer-to-peer questioning.
+[296|Normal (Web)        ] Administrators achieve a scalable, secure, and financially sustainable cloud-backed system that protects institutional data and reflects the university's structural identity.
+[297|Normal (Web)        ] 2.6 System Limitations and Legal/Ethical Considerations
+[298|Normal (Web)        ] While traditional educational platforms and e-learning environments used for collaboration have increased access to digital resources, their systemÆs architecture creates issues during their operation as well as issues regarding regulation when the a
+[299|Normal (Web)        ] 2.6.1 Technical Infrastructure and Network Constraints
+[300|Normal (Web)        ] A major point of failure for existing institutional learning systems is the fact that they cannot scale effectively when hosting heavy video content. Standard university servers usually lack the processing bandwidth and storage capacities needed to h
+[301|Normal (Web)        ] This challenge is made worse by regional network dependencies. Undergraduate students in developing environments like nigeria frequently navigate unstable network coverage, high mobile data costs, and slow internet connections (MDPI, 2022). Also, man
+[302|Normal (Web)        ] This would worsen educational inequality by excluding students who cannot afford expensive data packages or better hardware.
+[303|Normal (Web)        ] This technical gap is one of the reasons that the proposed platform runs on cloud architecture which uses video compression to maintain smooth mobile playback on restricted budgets.
+[304|Normal (Web)        ] 2.6.2 Institutional Security and Access Vulnerabilities
+[305|Normal (Web)        ] Any internal university application shoud be capable of protecting academic content, verify student identities and protect the platforms data.  However, traditional commercial options do not have login architectures made for univeristies or other ter
+[306|Normal (Web)        ] If the platform would be deployed securely for the university, the platform must have strict access control requirements. Unauthorized access or third-party data extraction violates basic privacy rules. In order to satisfy administrator expectations 
+[307|Heading 2           ] 2.7 Review of Related Works
+[308|Normal (Web)        ] The review of related works checks previous studies, academic projects, and published research on digital learning systems, video-based instruction, Peer-to-Peer learning, and collaborative educational platforms. The reason why this is necessary is t
+[309|Heading 3           ] 2.7.1 Study by Adewale & Ogunleye (2021):
+[310|Normal              ] Development of a Web-Based Learning Support System for Nigerian Universities
+The researchers designed a web-based platform that allows lecturers to upload course materials, lecture notes, and assignments for students. The system functions include use
+[311|Normal (Web)        ] Methodology:
+The system was developed using PHP, MySQL, and HTML/CSS. The system was tested with 150 students from a Nigerian university.
+[312|Normal (Web)        ] The empirical study by Adewale and Ogunleye (2021) shows the significant value of local platforms by designing a platform made for the operational facts of Nigerian university students. By focusing on making resources available, the system successful
+[313|Normal (Web)        ] However, the architecture showed clear limitations that restricted what it could do to traditional, passive content distribution. The system didnÆt have features such as video uploading or real-time streaming capabilities, relying instead on static t
+[314|Normal (Web)        ] The limitations of this research directly show the necessity of the proposed educational video platform. While the study assures the strong demand for dedicated digital spaces in Nigerian higher education, it also exposes the gap left by missing func
+[315|Heading 3           ] 2.7.2 Study by Okeke (2020):
+[316|Normal              ] A Mobile Peer Tutoring Application for First-Year Engineering Students
+[317|Normal (Web)        ] Summary:
+In this study a mobile peer tutoring app where senior students provided explanations to junior students using text notes, chat support, and solved examples.
+[318|Normal (Web)        ] Methodology:
+Agile development methodology was used. The tests were conducted through surveys and interviews.
+[319|Normal (Web)        ] The empirical evaluation of OkekeÆs (2020) mobile application demonstrated the clear value of peer-led academic support within higher institutions. By moving learning outside the traditional classroom, the system improved understanding concepts throu
+[320|Normal (Web)        ] Despite these benefits, the application's design has caused a lot of limitations on learning. The platform didnÆt have any video functionality, this means that students have to use static, text-based explanations and short written examples.
+[321|Normal (Web)        ] This research provides important validation for the proposed platform. While OkekeÆs findings shows that when students learn from each other it reduces anxiety and improves engagement, the clear limits of text and live chat justify a modern upgrade. 
+[322|Normal (Web)        ] .
+[323|Heading 3           ] 2.7.3 Study by Chukwuma & Daniel (2022):
+[324|Normal              ] Design of an E-Learning Video Delivery System Using Cloud Streaming Technologies
+[325|Normal (Web)        ] Summary:
+This research was about designing a cloud-based video platform for delivering lecturer-produced lessons. The system used adaptive streaming to increase performance under inconsistent internet speeds.
+[326|Normal (Web)        ] Methodology:
+Cloud-based architecture (AWS S3 + CloudFront). System was tested with HD and SD videos.
+[327|Normal (Web)        ] The research by Chukwuma and Daniel (2022) shows strong technical value by successfully implementing a cloud-based video streaming infrastructure. By taking advantage of video compression and bitrate streaming, their system addresses bandwidth issues
+[328|Normal (Web)        ] However, the platform doesnÆt use have a lot of engagement based on the fact that it is rigid and lecturer-centered. The software functions are used as a means for lecturers sending information to their students, there is no collaboration at all. It 
+[329|Normal (Web)        ] This technical framework directly informs the media handling of the new platform. The system uses cloud streaming and compression techniques to solve network instability. The new platform improves on this model by turning a simple broadcast tool into
+[330|Heading 3           ] 2.7.4 Study by Ibrahim (2019):
+[331|Normal              ] Evaluation of Moodle as a Learning Management System for Nigerian Universities
+[332|Normal (Web)        ] Summary:
+This work checks Moodle's adoption in Nigerian institutions, the focus would be on student engagement, usability and content organization.
+[333|Normal (Web)        ] Methodology:
+Questionnaires and system evaluation were conducted with 200 students from three universities.
+[334|Normal (Web)        ] IbrahimÆs (2019) evaluation of Moodle shows the major advantages of global Learning Management Systems. The platform is known for enforcing strong course structuring and it also provides a highly secure authentication system. Because it is widely ado
+[335|Normal (Web)        ] However, the system also exhibits functional weaknesses when applied to modern, media-heavy learning. The user interface has poor mobile responsiveness and presents a very complex and non-intuitive layout for new users. Moreover, It doesnÆt really su
+[336|Heading 3           ] 2.7.5 Study by Lin & Chen (2021)
+[337|Normal              ] Impact of Student-Generated Video Content on Learning Outcomes in Higher Education
+[338|Normal (Web)        ] Summary:
+This international study examined how students creating and sharing videos improved academic performance and retention. Students produced short explanatory clips on difficult course concepts.
+[339|Normal (Web)        ] Methodology:
+A controlled study involving 300 university students across three faculties, analyzing pre-test and post-test results.
+[340|Normal (Web)        ] The international study by Lin and Chen (2021) shows clear empirical evidence for the massive value of content creation led by students. The data they obtained shows that when students produce clips that can be used for instructions it leads to signi
+[341|Normal (Web)        ] However, the major thing they overlooked was the absence of a dedicated technological environment. Since there wasnÆt a central platform that would catalog and organize the files, the content remained fragmented and was never added into a learning sy
+[342|Normal (Web)        ] This study serves as the direct justification for the proposed project. While Lin and Chen prove that studentsÆ academic videos are incredibly powerful learning tools, the pratical flaws shows why an independent software infrastructure is needed. The
+
+================================================================================
+  CHAPTER THREE
+================================================================================
+[344|Heading 1           ] METHODOLOGY
+[345|Normal              ] 3.1 Overview
+[346|Normal              ] In this chapter, the method of designing and implementing the educational video platform, EduVid of Dominion University will be shown. It involves development strategies, life cycle, requirements, architecture and design approach to make sure the pla
+[347|Normal              ] 3.2 System Development Approach
+[348|Normal              ] In terms of the IEEE publication, 2022, the Software Development Life Cycle (SDLC) is a systematic (disciplined, quantifiable) software development and software maintenance approach. It sets out a series of stages û design, development, testing, and 
+[349|Normal              ] 3.2.1 The Agile Development Model
+[350|Normal              ] The development process is divided into multiple iterations called "sprints". According to Guerrero-Ulloa et al. (2023), this helps to break down a system into smaller, more manageable components, enabling each component to undergo testing before the
+[351|Normal              ] 3.3 Requirement Specifications
+[352|Normal              ] System requirements outline the non-functional and functional requirements of the system such that it may serve the needs of its users.
+[353|Normal              ] 3.3.1 Functional Requirements
+[354|Normal              ] Functional requirements specify the particular actions and functions the platform needs to execute. These requirements outline from the user's point of view the way the platform will function and the functionality the user will be able to use. Key re
+[355|Normal              ] 3.3.2 Non-Functional Requirements
+[356|Normal              ] These requirements are concerned with operational aspects of the app and user experience aspects. These include:
+Schedule, Quality: An intuitive user-interface with a "3-click rule", allowing a quick access to course materials for students.
+Responsiv
+[357|Normal              ] 3.4 System Architecture
+[358|Normal              ] System Architecture gives an overview of what is on the platform, and how they relate. EduVid adopts a Three-Tier Client-Server Architecture, which is optimized for Cloud-native applications. A modular design approach that separates out the presentat
+[359|Normal              ] 3.4.1 Client-Side (Front-end Web Application)
+[360|Normal              ] The platform is created based on a Single Page Application (SPA), with Vue.js 3 and powered by the Vite build tool. Pinia is being used to handle data flow because having to make requests to APIs to verify the user's authentication and get data back 
+[361|Normal              ] Built with the Vue.js 3 & Vite combination, this platform is designed as a high-performance, Single Page Application (SPA), leveraging the Vite build tool and Vue.js 3, featuring the Vuelist API.The platform was developed using Vue.js 3 & Vite, adapt
+[362|Normal              ] To manage complicated data flow, Pinia is used as the chief state management store. This records the global state of the application, including whether a user is being logged in or the current course that is being watched, and the real-time progress 
+[363|Normal              ] Bootstrap 5: Bootstrap 5 has a new responsive grid system that offers a mobile-first experience for Dominion University students. This makes it easy for people to access the platform on any device they're using, such as their phones, tablets, or lapt
+[364|Normal              ] Integrated with OAuth 2.0 and the frontend does the Google Identity handshake. It keeps hold of the Google sign-in token that the user provides, and helps send to Videos API backend services for authorizing video uploads to YouTube.
+[365|Normal              ] State Management: The frontend is responsible for state changes, e.g. if someone logs in to an application, the front keeps track of that, or the current course being viewed, or the upload of a video and its current status.
+[366|Normal              ] 3.4.2 Server-Side (Cloud Backend and API Services)
+[367|Normal              ] The server-side consists of media services that are managed on cloud-side and is responsible for authentication, data persistence and media processing.
+[368|Normal              ] Firebase Authentication is the entry point into authentication. It checks google information front-end returns and keeps the user's session end-to-end.
+[369|Normal              ] Cloud Firestore (NoSQL Database): This is the main data repository for platform metadata, with a flexible data structure for storing user profiles, video metadata (by linking to the YouTube Video IDs), and live logs of interactions, such as comments 
+[370|Normal              ] A custom backend hosted on Render to perform server-side logic that goes beyond the scope of a regular BaaS - Node.js & Express Microservice (Render). This includes:
+[371|Normal              ] YouTube Validation Pipeline: Custom scripts to interact with the YouTube Data API and verify the status of videos.
+[372|Normal              ] Tasks are automated moderation for links and validation of integrity of the video catalog, in a CRON-style.
+[373|Normal              ] o	API Quota Management: Logic to keep responses in cache and to perform request reordering to limit YouTube Data API v3 to daily quotas from the API.
+[374|Normal              ] YouTube Data API v3 (Media Storage & Processing): This is more of a niche back-end tier for video.
+[375|Normal              ] Raw video files are not stored on university's local server but pushed up to a dedicated channel for the university on YouTube.
+[376|Normal              ] o	Transcoding: YouTube clips are automatically transcoded to to multiple high resolution formats (360p, 720p, 1080p) to cater for the differing internet speeds of the students.
+[377|Normal              ] Cloud Storage: It is for assets that can be stored as static items like users' profile pictures, icon images of their application etc.
+[378|Normal              ] Vercel & Render Hosting: The app takes advantage of a hybrid hosting model, in contrast to the standard monolithic deployment.
+[379|Normal              ] o	Vercel: Hosts Vue.js frontend, on an edge network that secures the deployment of fast global access, encrypts using SSL.
+[380|Normal              ] o	Render: Managed environment for the Node.js back end, integration logic for external APIs.
+[397|Normal              ] Figure 2 shows client-server architecture (Anon, 2024).
+[401|Normal              ] 3.4.3 Data Flow Overview
+[402|Normal              ] A two-way request-response interaction is followed where one side to another:
+[403|Normal              ] 1.	Frontend makes a request (e.g., "Search for CSC 101").
+[404|Normal              ] 2. Firebase (Backend) fetches the values in the Firestore collection and returns a JSON object with all the matching YouTube VideoIDs.
+[405|Normal              ] 3. Frontend gets the IDs and embeds the video players directly in the dashboard of the student using the API from the YouTube IFrames.
+[406|Normal              ] 3.5 Database Design
+[407|Normal              ] The database becomes the point for the central storage of all forms of academic and user data and it enables structured organisation and the quick retrieval of course material. To deliver scalability and high performance, EduVid leverages a NoSQL, do
+[408|Normal              ] 3.5.1 Database Management System (DBMS)
+[409|Normal              ] Cloud Firestore was chosen for the EduVid project over SQL databases (such as MySQL) for the following reasons:
+[410|Normal              ] Flexible Schema: Firestore is a NoSQL database, which means that its data structure can be flexible. It's an essential part of backing up a variety of metadata (tags, comments, ratings) that can change over time as the platform expands.
+[411|Normal              ] Scalability: Firestore's serverless design can accommodate more and more students and expandable amounts of video metadata without impacting its performance.
+[412|Normal              ] Real-time Synchronization: Firestore provides real-time data synchronization, which is perfect for university settings where data must be changed on-the-fly from many different devices.
+[413|Normal              ] 3.5.2 Database Schema (Collections)
+[414|Normal              ] The logical data structure in the database consists of collections and documents. Each document has a number of data entities, which are expressed by pairs of keys and values.
+[415|Normal              ] Users Collection Manages identities, academic profiles and permissions of platform. UniqueID: uid (Primary Key) email name matricNumber programme level role isVerified (Boolean) photoURL createdAt
+[416|Normal              ] Videos Collection Stores all metainformation and logs engagement/moderation status for educational material. id type: videoId (Primary Key), title, description, department, courseCode (Foreign Key), level, topic, userId (Uploader ID), userEmail, thum
+[417|Normal              ] ò	Content Organisation Collections The content-organisations that serve as the backbone of the course and departments as organizations. Courses: courseId (Primary Key), code (e.g., SEN401), department, videoCount. Departments is a table with the foll
+[418|Normal              ] Someone might ask "what does that mean?". interaction collections (sub Collections): A big polymorphic collection would be a single collection of interactions, but the schema provides for more specific collections based on the different kinds of user
+[433|Normal              ] Figure 3: Entity relationship diagram for the educational video platform
+[435|Normal              ] 3.6 System Modeling
+[436|Normal              ] System modeling is very early in the software development cycle, extracting complexity from the system and presenting the abstraction through a visual model of the system's structure and behavior. The Unified Modeling Language (UML) was used to draw 
+[437|Normal              ] 3.6.1 Use Case Diagram
+[438|Normal              ] The Use Case Diagram is a visual representation of how actors in the system interact with the EduVid platform in terms of the functions that they perform. The design aims at a Student-Centric where the student is a consumer and a producer of knowledg
+[439|Normal              ] Key Actors:
+[440|Normal              ] Student (The User): Can register on Google or Manual forms, search by course code; view videos; upload peer learning content; post interactions (comments/flags).
+[441|Normal              ] The one who has permission to edit the Course Catalog and make æDelete or RetainÆ decisions for Flagged Video Queue for Academic Governance.
+[445|Normal              ] Figure 4 depicts a Use Case diagram that illustrates the educational video platform.
+[448|Normal              ] 3.7 Use of software tools and technologies.
+[449|Normal              ] Implementation of the EduVid platform is based on the stack of modern web technologies that were selected based on following fundamentals: Performance, Modularity, Deployment.
+[450|Normal              ] Frontend Framework: Vue.js 3 (Frontend Framework) is used as the main framework to create a Single Page Application (SPA). A reactive system component that delivers the seamless user experience whereby the system interface is updated asynchronously w
+[451|Normal              ] Vite (Build Tool): A fast frontend build tool and development server with support for Hot Module Replacement (HMR) for faster development and optimized production build.
+[452|Normal              ] ò	Pinia (State Management): Used as a library for managing the global state of Vue 3 applications, such as user authentication and real-time upload progress, as the official state-management library for Vue 3.
+[453|Normal              ] ò	Bootstrap 5 & CSS3 (UI Framework): Comes with a responsiveness grid system and pre-styled components. This works perfectly to ensure that the platform fits the different screen sizes, from smartphones to laptops, and the use of advanced elements (s
+[454|Normal              ] ò	DOM (Frontend Environment): Built a custom microservice architecture using the node.js/Express backend environment. This layer includes specialized code like the YouTube validation pipeline and a CRON style class for link moderation.
+[455|Normal              ] Youtube Data API v3: Used for academic video metadata management and making use of the global infrastructure of Youtube for hosting and transcoding large video files to multiple resolutions from 360p to 1080p).
+[456|Normal              ] Frontend Hosting: Vercel (Frontend Hosting): Deploy Vue.js frontend using an edge network, enabling ultra-fast delivery to every global customer and automated deployment on GitHub.
+[457|Normal              ] Furthermore, Render (Backend Hosting) offers a managed environment that runs the Node.js/Express API logic and background synchronization to-doÆs.
+[458|Normal              ] Firebase = Backend-as-a-service: Firebase offers a complete backend infrastructure, which means they will not need to manage physical servers. Authentications is used for secure logins, Firestore is the real-time database, YouTube Data API v3 is used
+[459|Normal              ] Version Control: GitHub is used for version control, and keeps track of changes in the code base, project iterations, and maintains code history over the development lifecycle.
+
+================================================================================
+  CHAPTER FOUR
+================================================================================
+[462|Heading 1           ] RESULTS AND DISCUSSION
+[463|Normal              ] 4.1 System Implementation
+[464|Normal              ] System implementation involves taking the decisions regarding the system from the design stage and putting them into practice so that students could use the system. When it came to building EduVid, we first had to break it down into various layers, i
+[465|Normal              ] 4.1.1 Frontend Implementation
+[466|Normal              ] For the front-end development, an intuitive and responsive Single-Page Application (SPA) was created with Vue.js 3, along with CSS3. This made students' and administrators' learning experience smooth.
+[467|Normal              ] To date, some of the following changes have been implemented:
+[468|Normal              ] User Authentication:  Integrated Google Identity with OAuth 2.0, enabling a secure login and session management process, which allow access only from verified institutional accounts.
+[469|Normal              ] In addition, Video Management Module has been created, allowing users to submit peer-learning content. The interface requires academic metadata (Course Code, Department, Level) to be attached, to align with curricula.
+[470|Normal              ] 3.	Search and Discovery Engine: Developed a filter mechanism to enable learners to locate content, searching with academic words or course codes such as SEN401.
+[471|Normal              ] For 4. Peer Interaction Module: Designed an experimental set-up in real time with a system of feedback based on comments and a rating system to assess the correctness of peers' explanations.
+[472|Normal              ] Administrator Governance Dashboard: They created a dedicated dashboard for overseeing the university, including a moderation queue for flagged-up content.
+[473|Normal              ] 4.1.2 Backend Implementation
+[474|Normal              ] The backend architecture of EduVid is a combination of a Backend-as-a-Service (BaaS) model through Firebase and a custom Node.js and Express microservice. This modular solution reduces manual server overhead for most of your data operations without c
+[475|Normal              ] In addition to the standard BaaS capabilities, a dedicated backend application environment was created using Node.js and Express as a secure middle-tier between the Vue.js frontend and the YouTube Data API for this microservice. This layer is respons
+[476|Normal              ] Data Management (Cloud Firestore): Cloud Firestore was designed as the main NoSQL document-oriented database for storing key platform data. The schema was optimized to ensure that the course queries hit the database related to video results at a very
+[477|Normal              ] The names and designated roles (Student / Admin) are stored in o.User Profiles.
+[478|Normal              ] o	VideoMetadata: Assigns a YouTube Video ID to internal academic structures such as Course Codes (e.g., SEN401), levels and departments.
+[479|Normal              ] o	Interaction Logs: Collects and stores real-time interaction data, such as peer-to-peer comments and quality ratings by Video ID.
+[480|Normal              ] Granular Firestore Security Rules were introduced to ensure proper access permissions to the database, thereby ensuring the security of the academic setting. These rules guarantee that:
+[481|Normal              ] Comments and upload of metadata are only allowed for the identified student with authenticated accounts on their college's server.
+[482|Normal              ] Users with verified admin claims can perform administrative functions, like delete content that was flagged or manage the curriculum catalog.
+[483|Normal              ] Users are denied access to raw databases structures; this is strictly forbidden and would not allow users to "scrape" the data for their own purposes or gain privileges.
+[484|Normal              ] The platform has API Integration and Automation support û YouTube Data API v3. YouTube comes with its own resource-heavy video hosting and transcoding capabilities while the custom backend logic handles the API Quota Management. It uses caching and r
+[485|Normal              ] Dynamic Assets: Cloud Storage is used exclusively for non-video assets, including user profile pictures, static education thumbnails, or any kind of content that is not video.
+[502|Normal              ] Source Code for the dashboard of EduVid
+[506|Normal              ] 4.1.3 Deployment and Hosting
+[507|Normal              ] Deploying and hosting software are crucial parts of software development. For EduVid, deployment means aptly pushing to a live environment where students can access the application and hosting means it's the infrastructure that makes it exist, access
+[508|Normal              ] The Vue.js-powered frontend is deployed to Frontend Hosting (Vercel), hitting the edge network to deliver the fastest frontends across the globe. It harnesses continuous deployment from GitHub, which means that as soon as someone creates an update to
+[509|Normal              ] 2.	Backend Hosting (Render): Backend services and APIs are run on Render. This gives a controlled space for server-side operations, which guarantees secure and stable working while integrating the databases and YouTube Data API.
+[510|Normal              ] 3. Global Accessibility: The video metadata and application resources can be hosted on these cloud-based services and accelerate their load time, ensuring a seamless experience regardless of the student's location.
+[511|Normal              ] 4.2 Software Testing
+[512|Normal              ] The software testing process was instrumental in the development of EduVid, which allowed them to perform as intended and follow the Agile methodology. A testing process was used with a structure to address specific areas of functionality.
+[513|Normal              ] 4.2.1 Unit Testing
+[514|Normal              ] Testing individual components was carried out during this phase and the problems are identified at an early stage.
+[515|Normal              ] The key units that were tested were:
+[516|Normal              ] ò	Data Anonymization: Employing algorithms to indiscernibly transform the data.ò	Training Set: A collection of example datasets that the system processes to manage and maintain accuracy.
+[517|Normal              ] ò	Authentication Handshakes: Checking the logic used for refreshing the token and redirects being considered secure.
+[518|Normal              ] 4.2.2 Integration Testing
+[519|Normal              ] Integration testing confirmed the functioning between modules and ensured a smooth movement of data between the different layers of a presentation, logic, external service.
+[520|Normal              ] Synchronized data with Vue.js front end and Node.js microservice, YouTube API IFrame, and Firestore; confirmed that data was updated in real time.
+[521|Normal              ] Token authorisation: Tests validated that metadata authorisation was worked out.Authenticated token: Authorization tokens were passed from client to back end successfully for metadata authorisation.
+[522|Normal              ] ò	Automated link integrity system tests using the Cron System: Tests were carried out for the automatic link integrity system managed by the Node.JS application that was built to check its integrity.
+[523|Normal              ] Automated link audit: The custom validation script found YouTube video links in the database and was able to spot broken links with a video that was deleted or taken private from the site on YouTube.
+[524|Normal              ] Link Integrity handling: This was explicitly tested to ensure the system can deal with broken links gracefully in the EduVid interface.
+[525|Normal              ] When the microservice successfully recognizes an invalid YouTube link then it will set the status field to "hidden" or "deleted" in Firestore, preventing students from accessing the articles.If the microservice recognizes that the link to YouTube is 
+[526|Normal              ] The results are based on the output of the source code but also on the performance of the integrated cloud services.
+[527|Normal              ] ELCAS Monitoring Plan
+[528|Normal              ] 4.3.1 System Outputs and Performance
+[529|Normal              ] The platform provides a useful tool that stops general platforms such as YouTube from distracting and making irrelevant video content available to a group students at a university, enabling them to locate and share video content that is dedicated to 
+[530|Normal              ] In terms of function, all the prominent features mentioned in the design phase were implemented successfully. Students can log in via their google accounts, then search for videos by course code, watch other student generated videos, add comments and
+[531|Normal              ] In performance testing, assessments were directed to the most apt to impact a student's daily life. Because Firestore is a NoSQL database, one aspect of concern was response time for search queries, which may not be dealing with complex filtering. Wh
+[532|Normal              ] When evaluating the system under the various conditions, it was found to be reliable and not experience any major latency or failure during the evaluation timeframe.
+[533|Normal              ] 4.3.2 Security and Maintenance
+[534|Normal              ] Security was always on a higher priority during the development process than as an afterthought. Having a multifunctional platform like EduVid, for handling student data, peer-submitted academic video content, and administration, was crucial, and the
+[535|Normal              ] The initial line of defence was Firestore security rules. These rules evolved and in the early stages of evolution, there were certain unintended read patterns that were accepted, only to come up during integration testing. Explicit testing was carri
+[536|Normal              ] Regarding data protection, automated backups were basic - they ran periodically in the Google Cloud Console. The odds of losing data through corruption or accidental deletion are very small, and this ensures that the content catalog, user profiles, a
+[537|Normal              ] Another maintenance factor that was considered was availability. Vercel and Render had an average uptime of 99.9% throughout the deploy and evaluation period. Vercel's edge infrastructure managed to deliver the front end without any downtime, while R
+[538|Heading 2           ] 4.4 User Interface (UI) Presentation
+[539|Normal              ] The following figures represent the implemented graphical user interface for Dominion University.
+[552|Normal              ] Figure 4.2: Landing Page of EduVid
+[564|Normal              ] Figure 4.3: Login Page of EduVid
+[575|Normal              ] Figure 4.4: Student Dashboard of EduVid
+[586|Normal              ] Figure 4.5: Search Results Page
+[596|Normal              ] Figure 4.6: Video Playback Page.
+[609|Normal              ] Figure 4.7: Content Upload Form
+[621|Normal              ] Figure 4.8: Comment and Rating Module
+[632|Normal              ] Figure 4.9: Administrator Dashboard
+[644|Normal              ] Figure 4.10: Content Moderation Panel
+[647|Normal              ] 4.5 Implementation Challenges and Maintenance
+[648|Normal              ] There are always challenges in the development process û and EduVid was no different. A number of issues arose along the way that needed to be addressed and worked out throughout the implementation process, in some cases benefitting from a little rei
+[649|Normal              ] OAuth 2.0 Configuration
+[650|Normal              ] I would say the biggest issue I had was integrating Google OAuth 2.0 being consistent in both the dev and production environment. In local development, everything was fine and worked as intended, but after deployment to Vercel, the application faced 
+[651|Normal              ] YouTube API Quota Management
+[652|Normal              ] The introduction of the YouTube Data API v3 presented another not so immediately apparent challenge early in development. The API works on a quota system for daily use, and some API calls use more quota units than they release, especially search call
+[653|Normal              ] The rule complexity of Firestore Security.
+[654|Normal              ] Creating the security rules for Firestore was more complicated than expected, and had to be strict enough to ensure it remains secure while being flexible enough to allow for platform features. Early rule sets were either too open (read privileges fo
+[655|Normal              ] Environment Variable Management
+[656|Normal              ] Making sure that environment variables are set across two different hosting providers, Vercel for the front end, and Render for the back end, added an extra layer of difficulty to the deployment process. Early deployments would fail at times, due to 
+[657|Normal              ] Maintenance Approach
+[658|Normal              ] Once the platform is live a number of steps needed to be taken to ensure it remained stable over the long-term.Once the platform is live, a handful of things needed to be set in place to ensure longterm stability. Scheduled backups have been set up f
+[659|Normal              ] Mitigating quota exhaustion with the Node.js backend: The API was optimized to restructure API calls to prevent quota exhaustion. The backend provides a mechanism to cache the most often-used metadata, eliminating the need for multiple queries for ea
+[660|Normal              ] Request Restructuring: This functionality not only updates metadata, but also uses optimized polling time intervals for CRON validation scripts that allow the platform to operate seamless for the entire day without breaching the API restrictions.
+
+================================================================================
+  CHAPTER FIVE
+================================================================================
+[662|Normal              ] SUMMARY, CONCLUSION, AND RECOMMENDATIONS
+[663|Normal              ] 5.1 Summary of Findings
+[664|Normal              ] The development of a Specialized Educational Platform for Religious and Theological Video Sharing for the unique educational environment of Dominion University has been a successful project. Based on the research and development process, several majo
+[665|Normal              ] Peer-to-Peer Efficacy: Theory was confirmed as student generated content was found to scaffold learning within the ZPD, and students functioned as More Knowledgeable Other's in the process.
+[666|Normal              ] Consequently, the need for bandwidth and local storage, which are frequently a challenge in Higher Education in Nigeria, made a three-tier client-server design, with a Vue 3 frontend (on Vercel), a Node.js/Express microservice (on Render), and Fireba
+[667|Normal              ] The solution is not an existing global learning solution like YouTube or Udemy, but rather Curriculum Alignment as it made learning a more efficient process by successfully organizing the content by specific Course Code and Topic from the Departmenta
+[668|Normal              ] User Engagement: The integrated real time interaction modules such as commenting and scoring were used to show a higher engagement in the learning environment: higher amount of people willing to participate in a collaborative learning process.
+[669|Normal              ] 5.2 Conclusion
+[670|Normal              ] The following 4 conclusions represent findings pertaining to the implementation of Agile Development Methodology in a hybrid cloud-native stack: Vite, Pinia and Node.js, and its impact on improving the accessibility and quality of higher education.Th
+[671|Normal              ] Overall the project has succeeded in major part of the project target which would be the development of a dedicated video sharing environment where students-driven knowledge would reduce the burden of the lecturers and thus provide overall improvemen
+[672|Normal              ] 5.3 Recommendations
+[673|Normal              ] The following recommendations are made to make the platform successful and successful in the future:
+[674|Normal              ] Institutional Integration: It's suggested that Dominion University official vertically implement this platform and blend it with current Learning Management Systems (LMS) for easy user authentication and course administration.
+[675|Normal              ] Incentivization Programs: The university could offer digital badges, certificate of contribution or academic recognition for giving a high volume of quality content.
+[676|Normal              ] Moderation and Quality Control: There is a simple moderator's dashboard, and a PPSC committee of departmental lecturers can regularly check the "Flagged" videos to ensure optimum academic accuracy.
+[677|Normal              ] Offline Accessibility: Progressive Web Apps (PWA) should be investigated for future versions of the software, enabling students to download or cache video files for offline access and address network instability and high data costs further.
+[678|Normal              ] Improved security: Should implement Multi-Factor Authentication (MFA) to protect student data and intellectual property as numbers of users continue to increase. Currently, the platform's basic authorization setupùbased on Firebase setup and segment-
+[679|Normal              ] 5.4 Recommendations for future work.
+[680|Normal              ] Additional research could examine the possibility of developing a more advanced recommendation system that could take advantage of the student history or learning gaps and suggest videos accordingly using Machine Learning. Furthermore, study of the a

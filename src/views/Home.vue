@@ -182,13 +182,20 @@ const filteredVideos = computed(() => {
   let vs = videos.value.filter(v => v.status === 'ready')
   const q = searchQuery.value.toLowerCase().trim()
   
-  // A. Search Bar (Title, Topic, or Code)
+  // A. Search Bar (Title, Topic, or Code) & Relevance Scoring
   if (q) {
-    vs = vs.filter(v =>
-      v.title?.toLowerCase().includes(q) ||
-      v.topic?.toLowerCase().includes(q) ||
-      v.courseCode?.toLowerCase().includes(q)
-    )
+    vs = vs.map(v => {
+      let score = 0;
+      if (v.title?.toLowerCase() === q) score += 10;
+      else if (v.title?.toLowerCase().includes(q)) score += 5;
+      
+      if (v.topic?.toLowerCase() === q) score += 8;
+      else if (v.topic?.toLowerCase().includes(q)) score += 4;
+      
+      if (v.courseCode?.toLowerCase().includes(q)) score += 3;
+      
+      return { ...v, _relevanceScore: score };
+    }).filter(v => v._relevanceScore > 0);
   }
   
   // B. Department Filter
@@ -207,7 +214,17 @@ const filteredVideos = computed(() => {
   }
 
   // E. Ranking/Sorting Logic
-  if (sortBy.value === 'trending') {
+  if (q && sortBy.value === 'recent') {
+    // If searching, prioritize relevance over recent
+    vs = [...vs].sort((a, b) => {
+      if (b._relevanceScore !== a._relevanceScore) {
+        return b._relevanceScore - a._relevanceScore;
+      }
+      const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
+      const db = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
+      return db - da
+    })
+  } else if (sortBy.value === 'trending') {
     vs = [...vs].sort((a, b) => (b.views || 0) - (a.views || 0))
   } else {
     vs = [...vs].sort((a, b) => {

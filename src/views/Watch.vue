@@ -7,16 +7,10 @@
       <router-link to="/" class="btn-glass" style="margin-top:1rem;">Back to Home</router-link>
     </div>
     <template v-else-if="video">
-      <div class="watch-layout">
-        <div class="player-col">
+      <div class="watch-layout row">
+        <div class="player-col col-12 col-lg-8">
           <div class="player-wrap">
-            <iframe
-              v-if="video.videoId"
-              :src="`https://www.youtube.com/embed/${video.videoId}?autoplay=1`"
-              title="YouTube video player" frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen class="player-iframe"
-            ></iframe>
+            <div v-if="video.videoId" id="player" class="player-iframe"></div>
             <div v-else class="player-placeholder">
               <i class="bi bi-hourglass-split"></i>
               <p>Video is being processed...</p>
@@ -57,33 +51,18 @@
 
             <div class="actions-row">
               <div class="rating-group">
-                <span class="action-label">Clarity</span>
+                <span class="action-label">Rating</span>
                 <div class="stars">
                   <button
-                    v-for="s in 5" :key="'c'+s"
-                    @click="submitRating('clarity', s)"
+                    v-for="s in 5" :key="'r'+s"
+                    @click="submitRating(s)"
                     class="star-btn"
-                    :class="{ active: s <= (myClarityRating || video.avgClarity || video.avgRating) }"
+                    :class="{ active: s <= (myRating || video.avgRating) }"
                   >
-                    <i :class="s <= (myClarityRating || video.avgClarity || video.avgRating) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
+                    <i :class="s <= (myRating || video.avgRating) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
                   </button>
                 </div>
-                <span class="rating-avg">{{ (video.avgClarity || video.avgRating)?.toFixed(1) || '—' }}</span>
-              </div>
-
-              <div class="rating-group">
-                <span class="action-label">Accuracy</span>
-                <div class="stars">
-                  <button
-                    v-for="s in 5" :key="'a'+s"
-                    @click="submitRating('accuracy', s)"
-                    class="star-btn"
-                    :class="{ active: s <= (myAccuracyRating || video.avgAccuracy) }"
-                  >
-                    <i :class="s <= (myAccuracyRating || video.avgAccuracy) ? 'bi bi-star-fill' : 'bi bi-star'"></i>
-                  </button>
-                </div>
-                <span class="rating-avg">{{ video.avgAccuracy?.toFixed(1) || '—' }}</span>
+                <span class="rating-avg">{{ video.avgRating?.toFixed(1) || '—' }}</span>
               </div>
 
               <button @click="showFlagModal = true" class="flag-btn" :class="{ flagged: video.isFlagged }">
@@ -128,14 +107,14 @@
                       <i class="bi bi-trash3"></i>
                     </button>
                   </div>
-                  <p class="comment-text">{{ c.text }}</p>
+                  <p class="comment-text" v-html="DOMPurify.sanitize(c.text)"></p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="sidebar-col">
+        <div class="sidebar-col col-12 col-lg-4">
           <h3 class="sidebar-title">More Videos</h3>
           <div v-for="v in relatedVideos" :key="v.id" class="related-card glass-card" @click="$router.push(`/watch/${v.id}`)">
             <img v-if="v.thumbnailUrl" :src="v.thumbnailUrl" class="related-thumb" alt="" />
@@ -237,6 +216,7 @@ import {
 } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth'
 import { incrementCourseCount, decrementCourseCount } from '../utils/course'
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const router = useRouter()
@@ -253,8 +233,7 @@ const relatedVideos = ref([])
 // Interaction State
 const newComment = ref('')
 const submittingComment = ref(false)
-const myClarityRating = ref(0)
-const myAccuracyRating = ref(0)
+const myRating = ref(0)
 const showFlagModal = ref(false)
 const flagReason = ref('')
 const submittingFlag = ref(false)
@@ -332,8 +311,14 @@ watch(() => route.params.id, (newId) => {
 let unsubComments = null
 
 const loadComments = () => {
-  unsubComments = onSnapshot(query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc')), (snap) => {
-    comments.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  unsubComments = onSnapshot(query(collection(db, 'videos', videoId, 'interactions'), where('type', '==', 'comment')), (snap) => {
+    let data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    data.sort((a, b) => {
+      const t1 = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+      const t2 = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+      return t1 - t2
+    })
+    comments.value = data
     loadingComments.value = false
   })
 }
@@ -416,7 +401,8 @@ const updateMetadata = async () => {
 const submitComment = async () => {
   if (!newComment.value.trim() || !authStore.user) return
   submittingComment.value = true
-  await addDoc(collection(db, 'videos', videoId, 'comments'), {
+  await addDoc(collection(db, 'videos', videoId, 'interactions'), {
+    type: 'comment',
     text: newComment.value.trim(),
     userId: authStore.user.uid,
     userEmail: authStore.user.email,
@@ -426,45 +412,36 @@ const submitComment = async () => {
   newComment.value = ''; submittingComment.value = false;
 }
 
-const submitRating = async (type, stars) => {
+const submitRating = async (stars) => {
   if (!authStore.user) return
-  if (type === 'clarity') myClarityRating.value = stars
-  else myAccuracyRating.value = stars
+  myRating.value = stars
 
-  const ratingsRef = collection(db, 'videos', videoId, 'ratings')
-  const existing = await getDocs(query(ratingsRef, where('userId', '==', authStore.user.uid)))
+  const interactionsRef = collection(db, 'videos', videoId, 'interactions')
+  const existing = await getDocs(query(interactionsRef, where('type', '==', 'rating'), where('userId', '==', authStore.user.uid)))
   
-  const ratingData = { [type]: stars }
   if (!existing.empty) {
-    await updateDoc(existing.docs[0].ref, ratingData)
+    await updateDoc(existing.docs[0].ref, { rating: stars })
   } else {
-    await addDoc(ratingsRef, { userId: authStore.user.uid, ...ratingData, createdAt: serverTimestamp() })
+    await addDoc(interactionsRef, { type: 'rating', userId: authStore.user.uid, rating: stars, createdAt: serverTimestamp() })
   }
 
   // Recalculate averages
-  const allRatings = await getDocs(ratingsRef)
-  let claritySum = 0, clarityCount = 0, accuracySum = 0, accuracyCount = 0
+  const allRatings = await getDocs(query(interactionsRef, where('type', '==', 'rating')))
+  let sum = 0, count = 0
   allRatings.docs.forEach(d => {
     const data = d.data()
-    if (data.clarity) { claritySum += data.clarity; clarityCount++ }
-    if (data.accuracy) { accuracySum += data.accuracy; accuracyCount++ }
-    // Legacy support: if old 'rating' field exists, treat as clarity
-    if (data.rating && !data.clarity) { claritySum += data.rating; clarityCount++ }
+    if (data.rating) { sum += data.rating; count++ }
   })
-  const avgClarity = clarityCount > 0 ? claritySum / clarityCount : 0
-  const avgAccuracy = accuracyCount > 0 ? accuracySum / accuracyCount : 0
-  const avgRating = clarityCount > 0 ? avgClarity : 0
+  const avgRating = count > 0 ? sum / count : 0
 
-  await updateDoc(doc(db, 'videos', videoId), { avgRating, avgClarity, avgAccuracy })
+  await updateDoc(doc(db, 'videos', videoId), { avgRating })
   video.value.avgRating = avgRating
-  video.value.avgClarity = avgClarity
-  video.value.avgAccuracy = avgAccuracy
 }
 
 const deleteComment = async (commentId) => {
   if (!authStore.user || !confirm('Delete this comment?')) return
   try {
-    await deleteDoc(doc(db, 'videos', videoId, 'comments', commentId))
+    await deleteDoc(doc(db, 'videos', videoId, 'interactions', commentId))
   } catch (e) {
     console.error('Failed to delete comment:', e)
     alert('Failed to delete comment.')
@@ -474,7 +451,8 @@ const deleteComment = async (commentId) => {
 const submitFlag = async () => {
   if (!flagReason.value || !authStore.user) return
   submittingFlag.value = true
-  await addDoc(collection(db, 'videos', videoId, 'flags'), {
+  await addDoc(collection(db, 'videos', videoId, 'interactions'), {
+    type: 'flag',
     reason: flagReason.value,
     userId: authStore.user.uid,
     userEmail: authStore.user.email,
@@ -487,6 +465,30 @@ const submitFlag = async () => {
   video.value.isFlagged = true; submittingFlag.value = false; showFlagModal.value = false
 }
 
+let player = null;
+const initYouTubePlayer = () => {
+  if (!window.YT) {
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    window.onYouTubeIframeAPIReady = () => {
+      createPlayer();
+    };
+  } else {
+    createPlayer();
+  }
+};
+
+const createPlayer = () => {
+  player = new window.YT.Player('player', {
+    videoId: video.value.videoId,
+    playerVars: {
+      'autoplay': 1,
+    }
+  });
+};
+
 onMounted(async () => {
   try {
     const snap = await getDoc(doc(db, 'videos', videoId))
@@ -494,6 +496,7 @@ onMounted(async () => {
       video.value = { id: snap.id, ...snap.data() }
       await updateDoc(doc(db, 'videos', videoId), { views: increment(1) })
       loadRecommendations(video.value)
+      initYouTubePlayer()
     }
     await loadComments()
   } catch (e) {

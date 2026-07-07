@@ -69,7 +69,7 @@
     <button @click="handleLogout(); menuOpen = false;" class="drawer-logout"><i class="bi bi-box-arrow-right me-3"></i>Sign out</button>
   </div>
 
-  <main class="main-content">
+  <main class="main-content container-fluid">
     <router-view></router-view>
   </main>
 

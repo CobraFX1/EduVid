@@ -10,6 +10,7 @@
           <button @click="activeTab = 'users'" :class="{ active: activeTab === 'users' }" class="tab-btn">User Directory</button>
           <button @click="activeTab = 'moderation'" :class="{ active: activeTab === 'moderation' }" class="tab-btn">Moderation Queue</button>
           <button @click="activeTab = 'comments'" :class="{ active: activeTab === 'comments' }" class="tab-btn">Comments</button>
+          <button @click="activeTab = 'matrics'" :class="{ active: activeTab === 'matrics' }" class="tab-btn">Matric Numbers</button>
           <button @click="activeTab = 'broken'" :class="{ active: activeTab === 'broken' }" class="tab-btn">Broken Links</button>
           <button @click="activeTab = 'sync-logs'" :class="{ active: activeTab === 'sync-logs' }" class="tab-btn">Sync Logs</button>
           <button @click="activeTab = 'analytics'" :class="{ active: activeTab === 'analytics' }" class="tab-btn">Analytics</button>
@@ -129,6 +130,11 @@
       <BrokenLinks />
     </div>
 
+    <!-- Matric Manager -->
+    <div v-if="activeTab === 'matrics'">
+      <MatricManager />
+    </div>
+
     <!-- Comment Moderation -->
     <div v-if="activeTab === 'comments'">
       <CommentModeration />
@@ -229,6 +235,7 @@ import UserManager from '../components/UserManager.vue'
 import ModerationQueue from '../components/ModerationQueue.vue'
 import BrokenLinks from '../components/BrokenLinks.vue'
 import CommentModeration from '../components/CommentModeration.vue'
+import MatricManager from '../components/MatricManager.vue'
 
 const activeTab = ref('videos')
 const videos = ref([])
@@ -407,7 +414,7 @@ watch(activeTab, (tab) => {
 .tab-btn:hover { color: var(--text-primary); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-.admin-filters { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.admin-filters { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.5rem; align-self: flex-end; }
 .filter-btn {
   background: var(--bg-card); border: 1px solid var(--border);
   color: var(--text-secondary); border-radius: 999px;

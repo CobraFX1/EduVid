@@ -73,6 +73,94 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
 }
 
 // ==========================================
+// 3.5 API QUOTA MANAGEMENT & CACHING
+// ==========================================
+
+// In-memory cache with TTL-based expiration for YouTube API responses
+class YouTubeCache {
+  constructor(defaultTtlMs = 60 * 60 * 1000) {
+    this._store = new Map();
+    this._defaultTtlMs = defaultTtlMs;
+  }
+
+  get(key) {
+    const entry = this._store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this._store.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  set(key, value, ttlMs) {
+    const ttl = ttlMs || this._defaultTtlMs;
+    this._store.set(key, { value, expiresAt: Date.now() + ttl });
+  }
+
+  clear() {
+    this._store.clear();
+  }
+
+  get size() {
+    // Purge expired entries before reporting size
+    const now = Date.now();
+    for (const [k, v] of this._store) {
+      if (now > v.expiresAt) this._store.delete(k);
+    }
+    return this._store.size;
+  }
+}
+
+// Tracks daily YouTube API quota consumption with midnight-UTC auto-reset
+class QuotaTracker {
+  constructor(dailyLimit = 10000) {
+    this.dailyLimit = dailyLimit;
+    this.used = 0;
+    this._resetDate = this._todayUTC();
+  }
+
+  _todayUTC() {
+    const now = new Date();
+    return `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+  }
+
+  _autoReset() {
+    const today = this._todayUTC();
+    if (today !== this._resetDate) {
+      this.used = 0;
+      this._resetDate = today;
+      console.log("[Quota] Daily quota counter reset.");
+    }
+  }
+
+  consume(units) {
+    this._autoReset();
+    this.used += units;
+    return this.used <= this.dailyLimit;
+  }
+
+  canAfford(units) {
+    this._autoReset();
+    return (this.used + units) <= this.dailyLimit;
+  }
+
+  getRemaining() {
+    this._autoReset();
+    return Math.max(0, this.dailyLimit - this.used);
+  }
+
+  getResetsAt() {
+    const now = new Date();
+    const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    return resetDate.toISOString();
+  }
+}
+
+const apiCache = new YouTubeCache();
+const quotaTracker = new QuotaTracker(10000);
+
+// ==========================================
 // 4. SETUP EXPRESS SERVER & MIDDLEWARE
 // ==========================================
 const app = express();
@@ -206,11 +294,20 @@ app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
   try {
     const otpDoc = await db.collection("otp_verifications").doc(req.user.uid).get();
 
-    if (!otpDoc.exists) return res.status(400).json({ error: "No OTP found. Please request a new one." });
+    if (!otpDoc.exists) {
+      console.log(`[OTP Verification] Failed for ${req.user.email}: No OTP document found.`);
+      return res.status(400).json({ error: "No OTP found. Please request a new one." });
+    }
 
     const data = otpDoc.data();
-    if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired." });
-    if (data.otp !== otp) return res.status(400).json({ error: "Invalid verification code." });
+    if (Date.now() > data.expiresAt) {
+      console.log(`[OTP Verification] Failed for ${req.user.email}: OTP expired.`);
+      return res.status(400).json({ error: "OTP expired." });
+    }
+    if (data.otp !== otp) {
+      console.log(`[OTP Verification] Failed for ${req.user.email}: Code mismatch (Expected ${data.otp}, got ${otp}).`);
+      return res.status(400).json({ error: "Invalid verification code." });
+    }
 
     // Success
     await db.collection("users").doc(req.user.uid).update({ isVerified: true });
@@ -228,11 +325,46 @@ app.post("/api/auth/verify-otp", verifyToken, async (req, res) => {
 // 5.5 MATRIC CHECK ROUTE
 // ==========================================
 app.post("/api/auth/check-matric", async (req, res) => {
-  const { matricNumber } = req.body;
-  if (!matricNumber) return res.status(400).json({ error: "Matric number is required." });
+  const { matricNumber, email } = req.body;
+  if (!matricNumber || !email) {
+    return res.status(400).json({ error: "Matric number and email are required." });
+  }
+
   try {
-    const snap = await db.collection("users").where("matricNumber", "==", matricNumber).get();
-    res.json({ exists: !snap.empty });
+    // 1. Check if the matric is valid at the university level
+    const validSnap = await db.collection("valid_matric_numbers").doc(matricNumber).get();
+    if (!validSnap.exists) {
+      return res.status(404).json({ exists: false, valid: false, error: "Invalid Matric Number. Not recognized by University." });
+    }
+
+    const validData = validSnap.data();
+
+    // 2. Strict Identity Verification (Matric + Email only)
+    const providedEmail = email.trim().toLowerCase();
+    const validEmail = validData.email ? validData.email.trim().toLowerCase() : undefined;
+
+    console.log(`[Matric Check] Verifying ${matricNumber}`);
+    console.log(`[Matric Check] Provided Email: '${providedEmail}'`);
+    console.log(`[Matric Check] Whitelisted Email: '${validEmail}'`);
+
+    if (providedEmail !== validEmail) {
+      console.log(`[Matric Check] REJECTED. Emails do not match.`);
+      return res.status(403).json({ 
+        exists: false, 
+        valid: false, 
+        error: "Identity mismatch. The provided email does not match University records for this Matric Number." 
+      });
+    }
+    console.log(`[Matric Check] ACCEPTED. Emails match perfectly.`);
+
+    // 3. Check if a user has already registered with this matric
+    const userSnap = await db.collection("users").where("matricNumber", "==", matricNumber).get();
+    if (!userSnap.empty) {
+      return res.status(409).json({ exists: true, valid: true, error: "This Matric Number is already registered." });
+    }
+
+    // 4. Valid and unused
+    res.json({ exists: false, valid: true });
   } catch (error) {
     console.error("Matric check error:", error);
     res.status(500).json({ error: "Failed to check matric number." });
@@ -358,6 +490,32 @@ app.get("/api/admin/flagged-videos", verifyToken, verifyAdmin, async (req, res) 
   }
 });
 
+// Admin route: Current YouTube API quota status
+app.get("/api/admin/quota-status", verifyToken, verifyAdmin, (req, res) => {
+  res.json({
+    dailyLimit: quotaTracker.dailyLimit,
+    used: quotaTracker.used,
+    remaining: quotaTracker.getRemaining(),
+    cacheSize: apiCache.size,
+    resetsAt: quotaTracker.getResetsAt(),
+  });
+});
+
+// Admin route: Recent Firestore backup records
+app.get("/api/admin/backups", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const snapshot = await db.collection("backups")
+      .orderBy("createdAt", "desc")
+      .limit(10)
+      .get();
+    const backups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(backups);
+  } catch (error) {
+    console.error("[Admin] Failed to fetch backups:", error.message);
+    res.status(500).json({ error: "Failed to fetch backup records." });
+  }
+});
+
 // ==========================================
 // 7. NODE-CRON YOUTUBE SYNCHRONIZATION
 // ==========================================
@@ -403,14 +561,34 @@ cron.schedule("0 * * * *", async () => {
 
     // Chunk into batches of 50 (YouTube API limit)
     const chunkSize = 50;
+    const costPerChunk = 3; // ~3 quota units per videos.list call
+    let quotaExhausted = false;
+
     for (let i = 0; i < videoIds.length; i += chunkSize) {
       const chunk = videoIds.slice(i, i + chunkSize);
+      const cacheKey = `sync:${chunk.join(",")}`;
 
-      // Fetch snippet + status so we can sync titles/descriptions too
-      const res = await retryWithBackoff(() => youtube.videos.list({
-        part: "snippet,status",
-        id: chunk.join(","),
-      }));
+      // Check quota before making an API call
+      if (!quotaTracker.canAfford(costPerChunk)) {
+        console.log(`[CRON] Quota exhausted (${quotaTracker.getRemaining()} remaining). Stopping sync early.`);
+        await logSyncEvent("warning", "Sync stopped early: YouTube API quota exhausted.", { remaining: quotaTracker.getRemaining() });
+        quotaExhausted = true;
+        break;
+      }
+
+      // Use cached response if available
+      let res = apiCache.get(cacheKey);
+      if (res) {
+        console.log(`[CRON] Cache hit for chunk starting at index ${i}`);
+      } else {
+        // Fetch snippet + status so we can sync titles/descriptions too
+        res = await retryWithBackoff(() => youtube.videos.list({
+          part: "snippet,status",
+          id: chunk.join(","),
+        }));
+        apiCache.set(cacheKey, res);
+        quotaTracker.consume(costPerChunk);
+      }
 
       const activeMap = new Map();
       res.data.items.forEach((item) => activeMap.set(item.id, item));
@@ -449,7 +627,7 @@ cron.schedule("0 * * * *", async () => {
       }
     }
 
-    const summary = `Sync complete. Checked: ${videoIds.length}, Broken: ${brokenCount}, Updated: ${updatedCount}`;
+    const summary = `Sync complete. Checked: ${quotaExhausted ? 'partial' : videoIds.length}, Broken: ${brokenCount}, Updated: ${updatedCount}, Quota remaining: ${quotaTracker.getRemaining()}`;
     console.log(`[CRON] ${summary}`);
     await logSyncEvent("info", summary);
 
@@ -458,6 +636,13 @@ cron.schedule("0 * * * *", async () => {
     await logSyncEvent("error", `Sync failed: ${error.message}`);
   }
 });
+
+// ==========================================
+// 7.5 AUTOMATED FIRESTORE BACKUP
+// ==========================================
+// Note: Automated database backups are configured via Google Cloud Console
+// rather than custom backend scripts.
+
 
 // ==========================================
 // 8. START SERVER

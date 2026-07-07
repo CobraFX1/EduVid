@@ -12,6 +12,7 @@
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
+    "dompurify": "^3.4.11",
     "firebase": "^12.8.0",
     "nodemailer": "^8.0.2",
     "pinia": "^3.0.4",

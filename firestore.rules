@@ -55,5 +55,15 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false; // Only written by backend service account (Admin SDK bypasses rules)
     }
+
+    match /backups/{backupId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only written by backend service account (Admin SDK bypasses rules)
+    }
+
+    match /valid_matric_numbers/{matricId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

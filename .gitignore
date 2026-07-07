@@ -31,3 +31,6 @@ deployment-steps.md
 future_improvements.md
 eduvid_roadmap.md
 DEPLOYMENT.md
+
+# Ignore word documents
+*.docx

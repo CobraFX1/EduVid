@@ -37,10 +37,16 @@
                     <i class="bi bi-exclamation-circle-fill"></i> {{ errorMessage }}
                 </div>
 
-                <button type="submit" class="btn-gradient submit-btn" :disabled="loading">
-                    <span v-if="loading"><i class="bi bi-arrow-repeat spin"></i> Saving...</span>
-                    <span v-else>Finish Setup</span>
-                </button>
+                <div class="action-buttons mt-4">
+                    <button type="submit" class="btn-gradient submit-btn mb-3" :disabled="loading">
+                        <span v-if="loading"><i class="bi bi-arrow-repeat spin"></i> Saving...</span>
+                        <span v-else>Finish Setup</span>
+                    </button>
+                    
+                    <button type="button" @click="cancelSetup" class="btn btn-outline-danger w-100" :disabled="loading">
+                        <i class="bi bi-box-arrow-left"></i> Sign out / Use a different account
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -83,18 +89,46 @@ const saveProfile = async () => {
 
     loading.value = true
     try {
+        // 2. CHECK DATABASE WHITELIST
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/check-matric`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                matricNumber: cleanMatric,
+                email: authStore.user.email
+            })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to verify Matric Number.');
+        }
+
         // We update the existing Google Auth user with these details
         // Note: We use the UID already stored in authStore.user
         await authStore._createUserProfile(authStore.user, {
             name: authStore.user.displayName,
             matricNumber: cleanMatric,
             programme: programme.value,
-            level: level.value
+            level: level.value,
+            isVerified: true // Google users don't need OTP!
         })
 
         router.push('/')
     } catch (error) {
         errorMessage.value = error.message
+    } finally {
+        loading.value = false
+    }
+}
+
+const cancelSetup = async () => {
+    loading.value = true
+    try {
+        await authStore.logout()
+        router.push('/login')
+    } catch (error) {
+        console.error("Logout failed:", error)
+        errorMessage.value = "Failed to sign out. Please clear your browser cache."
     } finally {
         loading.value = false
     }

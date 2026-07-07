@@ -288,34 +288,30 @@ const fetchActivity = async () => {
     // Get user's videos to scan their subcollections
     const vSnap = await getDocs(collection(db, 'videos'))
     for (const vDoc of vSnap.docs) {
-      // Check for user's comments on this video
-      const cSnap = await getDocs(
-        query(collection(db, 'videos', vDoc.id, 'comments'), where('userId', '==', authStore.user.uid))
+      // Check for user's interactions on this video
+      const iSnap = await getDocs(
+        query(collection(db, 'videos', vDoc.id, 'interactions'), where('userId', '==', authStore.user.uid))
       )
-      cSnap.docs.forEach(cDoc => {
-        const d = cDoc.data()
-        activity.push({
-          id: cDoc.id,
-          icon: 'bi bi-chat-left-text',
-          text: `Commented on "${vDoc.data().title}": "${(d.text || '').slice(0, 60)}${d.text?.length > 60 ? '...' : ''}"`,
-          date: formatDate(d.createdAt),
-          ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
-        })
-      })
-      // Check for user's ratings
-      const rSnap = await getDocs(
-        query(collection(db, 'videos', vDoc.id, 'ratings'), where('userId', '==', authStore.user.uid))
-      )
-      rSnap.docs.forEach(rDoc => {
-        const d = rDoc.data()
-        const stars = d.clarity || d.rating || 0
-        activity.push({
-          id: rDoc.id,
-          icon: 'bi bi-star-fill',
-          text: `Rated "${vDoc.data().title}" ${stars}/5 for clarity`,
-          date: formatDate(d.createdAt),
-          ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
-        })
+      iSnap.docs.forEach(iDoc => {
+        const d = iDoc.data()
+        if (d.type === 'comment') {
+          activity.push({
+            id: iDoc.id,
+            icon: 'bi bi-chat-left-text',
+            text: `Commented on "${vDoc.data().title}": "${(d.text || '').slice(0, 60)}${d.text?.length > 60 ? '...' : ''}"`,
+            date: formatDate(d.createdAt),
+            ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
+          })
+        } else if (d.type === 'rating') {
+          const stars = d.rating || 0
+          activity.push({
+            id: iDoc.id,
+            icon: 'bi bi-star-fill',
+            text: `Rated "${vDoc.data().title}" ${stars}/5`,
+            date: formatDate(d.createdAt),
+            ts: d.createdAt?.toMillis ? d.createdAt.toMillis() : 0
+          })
+        }
       })
     }
     activity.sort((a, b) => b.ts - a.ts)

@@ -36,11 +36,16 @@ export const useAuthStore = defineStore('auth', {
             const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/check-matric`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ matricNumber: rawMatric })
+                body: JSON.stringify({ 
+                    matricNumber: rawMatric,
+                    email: email 
+                })
             });
 
-            const { exists } = await response.json();
-            if (exists) throw new Error('This Matric Number is already registered.');
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to verify Matric Number.');
+            }
 
             // Reassign the clean matric number back into the data object
             profileData.matricNumber = rawMatric;
@@ -107,7 +112,7 @@ export const useAuthStore = defineStore('auth', {
                 programme: extra.programme || '', // UPDATED: Saved as 'programme' instead of 'department'
                 level: extra.level || '',
                 role: 'student',
-                isVerified: false,
+                isVerified: extra.isVerified !== undefined ? extra.isVerified : false,
                 createdAt: serverTimestamp()
             }
             await setDoc(doc(db, 'users', user.uid), profile)

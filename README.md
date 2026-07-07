@@ -85,3 +85,11 @@ node index.js
 
 ## 📈 Deployment
 This project is optimized for deployment on **Vercel** or **Netlify** (Frontend) and **Heroku** or **Google Cloud Functions** (Backend). Ensure all environment variables are mirrored in your production dashboard.
+
+---
+
+## 💾 Database Backups
+Automated backups are configured directly within the Google Cloud Console rather than the codebase. To set this up:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Navigate to **Firestore** > **Import/Export**.
+3. Use the **Scheduled Backups** feature to set up a daily export of the `users`, `videos`, `courses`, and `departments` collections to a designated Google Cloud Storage bucket.

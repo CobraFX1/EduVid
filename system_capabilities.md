@@ -25,7 +25,7 @@ A comprehensive list of specific actions and functionalities the system must be 
 12. The system shall allow peer tutors to edit the metadata of their own previously uploaded videos.
 
 ---
-CONTINUE FROM HERE
+
 
 ## 3. Link Integrity & Synchronization
 
@@ -34,16 +34,16 @@ CONTINUE FROM HERE
 15. The system shall update video metadata in the application if the source video's title or description is modified on YouTube.
 16. The system shall log synchronization events and errors for administrative review.
 
-COME BACK TO THIS SECTION LATER
+
 
 ---
 
 ## 4. Search & Discovery
 
-17. The system shall allow users to search for videos by course code, department, level, topic, and academic keywords.
+17. The system shall allow users to search for videos by title, topic, and course code via text search, with dropdown filters available for Department, Course Code, and Level.
 18. The system shall return search and metadata query results in under 2 seconds.
-19. The system shall provide filtering options to narrow results by Department, Course Code, Level, and Topic.
-20. The system shall display search results in a ranked, relevant order based on the user's query.
+19. The system shall provide filtering options to narrow results by Department, Course Code, and Level, with Topic discoverable via text search.
+20. The system shall display search results sorted by recency or popularity (view count), with text matching applied to titles, topics, and course codes.
 21. The system shall allow users to browse videos by academic category (department or course) without requiring a search query.
 22. The system shall ensure that any course material can be located within 3 clicks or fewer from the home screen (3-click rule).
 
@@ -72,10 +72,10 @@ COME BACK TO THIS SECTION LATER
 ## 7. Administrator Governance & Moderation
 
 33. The system shall provide a dedicated administrator dashboard for content moderation and user management.
-34. The system shall allow administrators to flag videos that violate content guidelines or are deemed inappropriate.
+34. The system shall allow authenticated users to flag videos that violate content guidelines, with administrators reviewing and acting on flagged content through a dedicated moderation queue.
 35. The system shall allow administrators to remove or hide flagged videos from public view.
 36. The system shall allow administrators to manage user permissions, including promoting users to Peer Tutor or revoking upload privileges.
-37. The system shall allow administrators to view reports on flagged content, user activity, and platform usage.
+37. The system shall allow administrators to view aggregate platform analytics and review flagged content through dedicated dashboard panels.
 38. The system shall allow administrators to moderate and delete inappropriate comments.
 
 ---
@@ -91,7 +91,7 @@ COME BACK TO THIS SECTION LATER
 
 ## 9. User Interface & Usability
 
-43. The system shall provide an intuitive, mobile-first responsive interface built with Bootstrap 5 that functions seamlessly on smartphones, tablets, and desktop PCs.
+43. The system shall provide an intuitive, responsive interface built with custom CSS3 and Bootstrap 5 utilities that functions seamlessly on smartphones, tablets, and desktop PCs.
 44. The system shall implement a clean navigation structure that adheres to the 3-click rule for accessing any course material.
 45. The system shall provide a user profile page displaying the user's uploaded videos, activity history, and account details.
 46. The system shall provide clear visual feedback (loading indicators, success/error messages) for all user actions.
